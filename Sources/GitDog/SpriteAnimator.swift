@@ -37,8 +37,15 @@ final class SpriteAnimator {
     }
 
     /// Play a transient celebration, then fall back to the base state.
+    /// Persistent states (infinite duration) are redirected to `setBase` —
+    /// scheduling an infinite revert would leave `revertWork` set forever and
+    /// silently brick every future `setBase`.
     func play(_ state: DogState, duration: TimeInterval? = nil) {
         let seconds = duration ?? Self.defaultDuration(for: state)
+        guard seconds.isFinite else {
+            setBase(state)
+            return
+        }
         apply(state)
         revertWork?.cancel()
         let work = DispatchWorkItem { [weak self] in
