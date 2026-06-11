@@ -2,6 +2,8 @@ import AppKit
 
 // Menu-bar-only app: no Dock icon, no main window. LSUIElement in Info.plist
 // hides the Dock icon for bundled builds; .accessory covers `swift run` too.
+SpriteRenderTool.runIfRequested()
+
 let app = NSApplication.shared
 app.setActivationPolicy(.accessory)
 
