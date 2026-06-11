@@ -9,7 +9,8 @@ swift build -c "$CONF"
 
 BIN=".build/$CONF/GitDog"
 APP="dist/GitDog.app"
-VERSION=$(grep -m1 '"version"' VERSION 2>/dev/null || echo "0.1.0")
+# Single source of truth for the bundle version (used in Info.plist below).
+VERSION="0.1.0"
 
 rm -rf "$APP"
 mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
@@ -25,7 +26,7 @@ cat > "$APP/Contents/Info.plist" <<PLIST
   <key>CFBundleName</key><string>GitDog</string>
   <key>CFBundleDisplayName</key><string>GitDog</string>
   <key>CFBundlePackageType</key><string>APPL</string>
-  <key>CFBundleShortVersionString</key><string>0.1.0</string>
+  <key>CFBundleShortVersionString</key><string>$VERSION</string>
   <key>CFBundleVersion</key><string>1</string>
   <key>LSMinimumSystemVersion</key><string>14.0</string>
   <key>LSUIElement</key><true/>

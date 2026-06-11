@@ -1,12 +1,18 @@
 import SwiftUI
 import ServiceManagement
+import AppKit
 
 /// Scaffold root view: brand header, connection target, launch-at-login.
 /// The Inbox / composer / Treats screens replace the center section in
 /// gitdog-mac#5–#7; sign-in lands with gitdog-mac#4.
 struct PopoverRootView: View {
-    @State private var launchAtLogin = SMAppService.mainApp.status == .enabled
+    @State private var launchAtLogin = false
     @State private var launchAtLoginError: String?
+    /// Suppresses the registration side effect while we sync UI state from
+    /// the system (initial read, error revert) — without it, reverting the
+    /// toggle after a failed register() re-fires onChange and runs an
+    /// unintended unregister(), masking the real error.
+    @State private var syncingToggle = false
 
     var body: some View {
         VStack(spacing: 0) {
@@ -23,7 +29,9 @@ struct PopoverRootView: View {
             Divider()
             footer
         }
-        .frame(width: 360, height: 420)
+        .frame(width: StatusItemController.popoverSize.width,
+               height: StatusItemController.popoverSize.height)
+        .onAppear(perform: syncFromSystem)
     }
 
     private var header: some View {
@@ -45,6 +53,7 @@ struct PopoverRootView: View {
                 .font(.system(size: 12))
                 .toggleStyle(.checkbox)
                 .onChange(of: launchAtLogin) { _, enabled in
+                    guard !syncingToggle else { return }
                     setLaunchAtLogin(enabled)
                 }
             if let error = launchAtLoginError {
@@ -66,6 +75,15 @@ struct PopoverRootView: View {
         .padding(.vertical, 10)
     }
 
+    /// Re-read the real registration state every time the popover opens, so
+    /// changes made in System Settings → Login Items are reflected (and the
+    /// blocking SMAppService XPC read stays off the app-launch path).
+    private func syncFromSystem() {
+        syncingToggle = true
+        launchAtLogin = SMAppService.mainApp.status == .enabled
+        syncingToggle = false
+    }
+
     private func setLaunchAtLogin(_ enabled: Bool) {
         launchAtLoginError = nil
         do {
@@ -76,9 +94,12 @@ struct PopoverRootView: View {
             }
         } catch {
             // `swift run` binaries aren't app bundles; SMAppService needs the
-            // bundled build (scripts/make-app.sh). Surface the real error.
+            // bundled build (scripts/make-app.sh). Surface the real error and
+            // revert the toggle without re-triggering the side effect.
             launchAtLoginError = error.localizedDescription
+            syncingToggle = true
             launchAtLogin = SMAppService.mainApp.status == .enabled
+            syncingToggle = false
         }
     }
 }

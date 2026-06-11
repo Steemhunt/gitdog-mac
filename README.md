@@ -17,12 +17,19 @@ Requires macOS 14+ and Swift 6 command line tools.
 # dev loop
 swift build && swift run            # status item appears; popover on click
 
-# bundled app (needed for launch-at-login and the gitdog:// URL scheme)
+# bundled app (needed for launch-at-login; the gitdog:// URL scheme
+# is registered when sign-in lands in #4)
 ./scripts/make-app.sh release
 open dist/GitDog.app
 ```
 
-Point at a non-default server with `GITDOG_SERVER=http://localhost:3000`.
+Point at a non-default server with `GITDOG_SERVER` (absolute http(s) URL).
+Note: `open` does not pass your shell's environment — for the bundled build,
+launch the binary directly:
+
+```bash
+GITDOG_SERVER=http://localhost:3000 dist/GitDog.app/Contents/MacOS/GitDog
+```
 
 ## Architecture
 
