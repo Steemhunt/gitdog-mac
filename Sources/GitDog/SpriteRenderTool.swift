@@ -11,17 +11,17 @@ enum SpriteRenderTool {
         try? FileManager.default.createDirectory(at: base, withIntermediateDirectories: true)
 
         for state in DogState.allCases {
-            for (i, cells) in Sprites.frames(for: state).enumerated() {
+            for i in 0..<Sprites.frameCount(for: state) {
                 let name = "\(state.rawValue)-\(i + 1)"
-                write(cells: cells, scale: 8, to: base.appendingPathComponent("\(name)@8x.png"))
-                write(cells: cells, scale: 1, to: base.appendingPathComponent("\(name).png"))
+                write(state: state, frame: i, scale: 8, to: base.appendingPathComponent("\(name)@8x.png"))
+                write(state: state, frame: i, scale: 1, to: base.appendingPathComponent("\(name).png"))
             }
         }
         print("sprites rendered to \(base.path)")
         exit(0)
     }
 
-    private static func write(cells: [(Int, Int)], scale: CGFloat, to url: URL) {
+    private static func write(state: DogState, frame: Int, scale: CGFloat, to url: URL) {
         let size = NSSize(width: Sprites.canvas.width * scale,
                           height: Sprites.canvas.height * scale)
         guard let rep = NSBitmapImageRep(
@@ -34,11 +34,10 @@ enum SpriteRenderTool {
         NSGraphicsContext.current = NSGraphicsContext(bitmapImageRep: rep)
         NSColor.white.setFill()
         NSRect(origin: .zero, size: size).fill()
-        NSColor.black.setFill()
-        let px = 2 * scale
-        for (col, row) in cells {
-            NSRect(x: CGFloat(col) * px, y: CGFloat(row) * px, width: px, height: px).fill()
-        }
+        let transform = NSAffineTransform()
+        transform.scale(by: scale)
+        transform.concat()
+        Sprites.draw(state: state, frame: frame)
         NSGraphicsContext.restoreGraphicsState()
 
         if let data = rep.representation(using: .png, properties: [:]) {

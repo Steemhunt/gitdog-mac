@@ -1,116 +1,223 @@
 import AppKit
 
 /// The menu bar dog's animation states.
-/// Mapping (EPIC + design package `design/icons/strip-*.jpg`):
-/// - `sleep`   — idle, nothing to do (2 frames: curled up, Z toggle)
+/// - `sleep`   — idle (2 frames: curled up, Z toggle)
 /// - `arrived` — unread request(s) waiting (2 frames: sitting alert, bone blink)
-/// - `wag`     — a payout just landed (3 frames: tail positions), transient
-/// - `run`     — cash-out success zoomies (4-frame run cycle), transient
+/// - `wag`     — payout landed (3 tail positions), transient
+/// - `run`     — cash-out zoomies (4-frame run cycle), transient
 enum DogState: String, CaseIterable {
     case sleep, arrived, wag, run
 }
 
-/// Pixel-art sprite frames, hand-traced from the design strips onto a 9×9
-/// cell grid (2pt cells on the 18pt menu bar canvas). Cells are (col, row)
-/// with row 0 at the BOTTOM. All frames render as template images so the
-/// silhouette adapts to light/dark menu bars.
+/// Smooth template silhouettes drawn with bezier paths on the 18pt canvas
+/// (gitdog-mac#12 — pixel art is illegible at menu bar size; RunCat-style
+/// readable anatomy instead). Pixel art remains the brand everywhere else.
+/// All frames render as template images (light/dark adaptive).
 enum Sprites {
     static let canvas = NSSize(width: 18, height: 18)
-    private static let cell: CGFloat = 2
 
-    // MARK: frame data
-
-    /// Lying curled, head left, tail tucked.
-    private static let sleepBody: [(Int, Int)] = [
-        // head (left, resting on paws)
-        (1, 3), (2, 3), (1, 2), (2, 2),
-        // ear nub
-        (2, 4),
-        // body mound
-        (3, 3), (4, 3), (5, 3), (6, 3),
-        (3, 2), (4, 2), (5, 2), (6, 2), (7, 2),
-        // tail curled along the body
-        (7, 3), (8, 2),
-    ]
-
-    /// Sitting upright, facing left, ears perked (from the scaffold glyph).
-    private static let sittingAlert: [(Int, Int)] = [
-        // head + snout
-        (1, 5), (2, 5), (3, 5), (4, 5),
-        (2, 6), (3, 6),
-        // perked ears
-        (2, 7), (4, 7),
-        // chest + body
-        (3, 4), (4, 4), (5, 4), (6, 4),
-        (4, 3), (5, 3), (6, 3),
-        // tail up
-        (7, 5), (7, 6),
-        // legs
-        (4, 2), (6, 2), (4, 1), (6, 1),
-    ]
-
-    /// Standing side profile (shared base for wag/run), facing left.
-    /// Tail and legs are appended per frame.
-    private static let standingCore: [(Int, Int)] = [
-        // head + snout
-        (1, 4), (2, 4), (1, 5), (2, 5),
-        // ear
-        (2, 6),
-        // body
-        (3, 4), (4, 4), (5, 4), (6, 4),
-        (3, 5), (4, 5), (5, 5), (6, 5),
-    ]
-
-    static func frames(for state: DogState) -> [[(Int, Int)]] {
+    static func frameCount(for state: DogState) -> Int {
         switch state {
-        case .sleep:
-            return [
-                sleepBody,
-                sleepBody + [(6, 5), (7, 6), (8, 7)], // rising-Z dots
-            ]
-        case .arrived:
-            return [
-                sittingAlert,
-                sittingAlert + [(5, 8), (6, 8), (7, 8)], // bone blink above the back, clear of the ears
-            ]
-        case .wag:
-            let legs = [(3, 2), (3, 3), (6, 2), (6, 3)]
-            return [
-                standingCore + legs + [(7, 4), (8, 3)], // tail low
-                standingCore + legs + [(7, 5), (7, 6)], // tail up
-                standingCore + legs + [(7, 4), (8, 5)], // tail mid-high
-            ]
-        case .run:
-            return [
-                // extended stride
-                standingCore + [(2, 2), (3, 3), (6, 3), (7, 2), (8, 4)],
-                // landing
-                standingCore + [(3, 2), (3, 3), (6, 2), (6, 3), (8, 4)],
-                // gathered under the body
-                standingCore + [(4, 2), (4, 3), (5, 2), (5, 3), (8, 5)],
-                // pushing off
-                standingCore + [(3, 2), (3, 3), (6, 2), (6, 3), (8, 5)],
-            ]
+        case .sleep, .arrived: 2
+        case .wag: 3
+        case .run: 4
         }
     }
 
-    // MARK: rendering
+    static func images(for state: DogState) -> [NSImage] {
+        (0..<frameCount(for: state)).map { image(for: state, frame: $0) }
+    }
 
-    static func image(for cells: [(Int, Int)]) -> NSImage {
+    static func image(for state: DogState, frame: Int) -> NSImage {
         let image = NSImage(size: canvas, flipped: false) { _ in
-            NSColor.black.setFill()
-            for (col, row) in cells {
-                NSRect(x: CGFloat(col) * cell, y: CGFloat(row) * cell,
-                       width: cell, height: cell).fill()
-            }
+            draw(state: state, frame: frame)
             return true
         }
         image.isTemplate = true
         return image
     }
 
-    /// All frames for a state, pre-rendered.
-    static func images(for state: DogState) -> [NSImage] {
-        frames(for: state).map(image(for:))
+    /// Draws one frame in an 18×18 coordinate space (origin bottom-left).
+    /// Callers may scale the CTM first (render harness does 8×).
+    static func draw(state: DogState, frame: Int) {
+        NSColor.black.set()
+        switch state {
+        case .sleep: drawSleep(zVisible: frame == 1)
+        case .arrived: drawSitting(boneVisible: frame == 1)
+        case .wag: drawStanding(tailFrame: frame)
+        case .run: drawRun(frame: frame)
+        }
+    }
+
+    // MARK: shared parts (dog faces right)
+
+    private static func fillEllipse(_ x: CGFloat, _ y: CGFloat, _ w: CGFloat, _ h: CGFloat) {
+        NSBezierPath(ovalIn: NSRect(x: x, y: y, width: w, height: h)).fill()
+    }
+
+    private static func capsule(_ x: CGFloat, _ y: CGFloat, _ w: CGFloat, _ h: CGFloat) {
+        NSBezierPath(roundedRect: NSRect(x: x, y: y, width: w, height: h),
+                     xRadius: min(w, h) / 2, yRadius: min(w, h) / 2).fill()
+    }
+
+    /// Thick round-capped stroke — used for legs and tails (RunCat-style limbs).
+    private static func limb(from a: NSPoint, to b: NSPoint, width: CGFloat = 1.8) {
+        let path = NSBezierPath()
+        path.move(to: a)
+        path.line(to: b)
+        path.lineWidth = width
+        path.lineCapStyle = .round
+        path.stroke()
+    }
+
+    private static func triangle(_ p1: NSPoint, _ p2: NSPoint, _ p3: NSPoint) {
+        let path = NSBezierPath()
+        path.move(to: p1); path.line(to: p2); path.line(to: p3)
+        path.close(); path.fill()
+    }
+
+    /// Head with snout and one visible ear, centered at `center`.
+    private static func head(center: NSPoint, earUp: Bool) {
+        fillEllipse(center.x - 3, center.y - 2.8, 6, 5.6)
+        // snout wedge
+        capsule(center.x + 1.6, center.y - 1.6, 3.0, 2.4)
+        // ear (triangle on top, leaning back slightly)
+        if earUp {
+            triangle(NSPoint(x: center.x - 2.2, y: center.y + 1.8),
+                     NSPoint(x: center.x - 1.1, y: center.y + 5.2),
+                     NSPoint(x: center.x + 0.6, y: center.y + 2.4))
+        } else {
+            // relaxed ear, folded back
+            triangle(NSPoint(x: center.x - 2.4, y: center.y + 1.6),
+                     NSPoint(x: center.x - 3.4, y: center.y + 4.2),
+                     NSPoint(x: center.x - 0.2, y: center.y + 2.4))
+        }
+    }
+
+    // MARK: states
+
+    private static func drawStanding(tailFrame: Int) {
+        // legs first (behind the body)
+        limb(from: NSPoint(x: 6.0, y: 6.5), to: NSPoint(x: 5.6, y: 1.2))
+        limb(from: NSPoint(x: 8.0, y: 6.5), to: NSPoint(x: 8.2, y: 1.2))
+        limb(from: NSPoint(x: 11.2, y: 6.5), to: NSPoint(x: 11.0, y: 1.2))
+        limb(from: NSPoint(x: 13.0, y: 6.5), to: NSPoint(x: 13.4, y: 1.2))
+        // body
+        capsule(4.2, 5.6, 10.8, 4.8)
+        // head
+        head(center: NSPoint(x: 14.2, y: 10.6), earUp: true)
+        // tail — three wag positions
+        let tip: NSPoint = switch tailFrame {
+        case 0: NSPoint(x: 1.0, y: 5.6)    // low
+        case 1: NSPoint(x: 1.6, y: 13.0)   // high
+        default: NSPoint(x: 0.6, y: 9.6)   // mid
+        }
+        limb(from: NSPoint(x: 4.8, y: 8.6), to: tip, width: 1.6)
+    }
+
+    private static func drawRun(frame: Int) {
+        // slight vertical bounce on the gathered frames
+        let bounce: CGFloat = (frame == 2) ? 0.8 : 0
+        let hipY = 6.2 + bounce
+        let frontHip = NSPoint(x: 12.4, y: hipY)
+        let backHip = NSPoint(x: 6.2, y: hipY)
+
+        // leg positions per phase: extended → landing → gathered → push-off
+        switch frame {
+        case 0: // full stride
+            limb(from: frontHip, to: NSPoint(x: 16.4, y: 1.4))
+            limb(from: frontHip, to: NSPoint(x: 14.2, y: 1.0))
+            limb(from: backHip, to: NSPoint(x: 2.2, y: 1.4))
+            limb(from: backHip, to: NSPoint(x: 4.0, y: 1.0))
+        case 1: // landing
+            limb(from: frontHip, to: NSPoint(x: 14.6, y: 1.0))
+            limb(from: frontHip, to: NSPoint(x: 12.6, y: 1.2))
+            limb(from: backHip, to: NSPoint(x: 4.4, y: 1.0))
+            limb(from: backHip, to: NSPoint(x: 6.4, y: 1.2))
+        case 2: // gathered under the body
+            limb(from: frontHip, to: NSPoint(x: 11.0, y: 1.6))
+            limb(from: frontHip, to: NSPoint(x: 12.8, y: 2.0))
+            limb(from: backHip, to: NSPoint(x: 7.6, y: 1.6))
+            limb(from: backHip, to: NSPoint(x: 6.0, y: 2.0))
+        default: // push-off
+            limb(from: frontHip, to: NSPoint(x: 15.2, y: 1.8))
+            limb(from: frontHip, to: NSPoint(x: 13.0, y: 1.0))
+            limb(from: backHip, to: NSPoint(x: 3.2, y: 2.2))
+            limb(from: backHip, to: NSPoint(x: 5.2, y: 1.0))
+        }
+        // body leans into the run
+        capsule(4.0, 5.4 + bounce, 11.0, 4.6)
+        head(center: NSPoint(x: 14.6, y: 9.8 + bounce), earUp: false)
+        // tail streams behind
+        limb(from: NSPoint(x: 4.6, y: 8.2 + bounce), to: NSPoint(x: 0.8, y: 10.4 + bounce), width: 1.6)
+    }
+
+    private static func drawSitting(boneVisible: Bool) {
+        // body: wide-bottomed rounded wedge (haunch up to the shoulders)
+        let body = NSBezierPath()
+        body.move(to: NSPoint(x: 3.0, y: 1.2))
+        body.curve(to: NSPoint(x: 9.4, y: 11.0),
+                   controlPoint1: NSPoint(x: 3.0, y: 6.8),
+                   controlPoint2: NSPoint(x: 6.0, y: 10.6))
+        body.curve(to: NSPoint(x: 13.2, y: 1.2),
+                   controlPoint1: NSPoint(x: 12.4, y: 11.0),
+                   controlPoint2: NSPoint(x: 13.2, y: 6.0))
+        body.close()
+        body.fill()
+        // rounded base so the wedge sits naturally
+        fillEllipse(2.8, 0.6, 10.6, 3.6)
+        // head clearly above the body
+        fillEllipse(6.6, 9.6, 6.4, 5.8)
+        // snout to the right
+        capsule(11.6, 11.0, 2.8, 2.2)
+        // two upright ears
+        triangle(NSPoint(x: 6.8, y: 13.6), NSPoint(x: 7.6, y: 17.2), NSPoint(x: 9.4, y: 14.4))
+        triangle(NSPoint(x: 10.2, y: 14.4), NSPoint(x: 11.6, y: 17.0), NSPoint(x: 12.6, y: 13.6))
+        // tail curled around the haunch
+        limb(from: NSPoint(x: 3.4, y: 1.8), to: NSPoint(x: 0.8, y: 4.4), width: 1.6)
+
+        if boneVisible {
+            drawBone(center: NSPoint(x: 15.2, y: 16.4))
+        }
+    }
+
+    /// Tiny bone: bar + four end knobs.
+    private static func drawBone(center: NSPoint) {
+        capsule(center.x - 2.0, center.y - 0.55, 4.0, 1.1)
+        for dx in [-2.0, 2.0] as [CGFloat] {
+            for dy in [-0.6, 0.6] as [CGFloat] {
+                fillEllipse(center.x + dx - 0.75, center.y + dy - 0.75, 1.5, 1.5)
+            }
+        }
+    }
+
+    private static func drawSleep(zVisible: Bool) {
+        // curled mound
+        fillEllipse(2.6, 1.6, 11.8, 6.6)
+        // head resting on the near side, ear relaxed
+        fillEllipse(9.6, 4.2, 5.4, 4.6)
+        triangle(NSPoint(x: 11.4, y: 7.6),
+                 NSPoint(x: 12.2, y: 10.2),
+                 NSPoint(x: 13.8, y: 7.8))
+        // tail tucked along the front
+        limb(from: NSPoint(x: 3.4, y: 2.6), to: NSPoint(x: 7.2, y: 1.6), width: 1.6)
+
+        if zVisible {
+            drawZ(at: NSPoint(x: 13.6, y: 12.2), size: 2.2)
+            drawZ(at: NSPoint(x: 15.6, y: 15.2), size: 1.5)
+        }
+    }
+
+    /// A little "z" glyph drawn with strokes.
+    private static func drawZ(at origin: NSPoint, size: CGFloat) {
+        let path = NSBezierPath()
+        path.move(to: NSPoint(x: origin.x, y: origin.y + size))
+        path.line(to: NSPoint(x: origin.x + size, y: origin.y + size))
+        path.line(to: NSPoint(x: origin.x, y: origin.y))
+        path.line(to: NSPoint(x: origin.x + size, y: origin.y))
+        path.lineWidth = 0.9
+        path.lineCapStyle = .round
+        path.lineJoinStyle = .round
+        path.stroke()
     }
 }
