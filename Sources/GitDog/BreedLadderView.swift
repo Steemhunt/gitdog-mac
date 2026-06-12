@@ -6,6 +6,8 @@ import SwiftUI
 struct BreedLadderView: View {
     let me: APIClient.Me
     @Binding var route: ReviewerRoute
+    /// Where ← returns to (set by SignedInView to the route that opened the ladder).
+    var backRoute: ReviewerRoute = .inbox
 
     var body: some View {
         VStack(spacing: 0) {
@@ -29,7 +31,7 @@ struct BreedLadderView: View {
 
     private var topBar: some View {
         HStack(spacing: 10) {
-            Button { route = .inbox } label: { Text("←").font(.system(size: 15)) }
+            Button { route = backRoute } label: { Text("←").font(.system(size: 15)) }
                 .buttonStyle(.plain).foregroundStyle(Theme.cream)
             Text("THE BREED LADDER")
                 .font(.custom(Theme.pixelFont, size: 10))

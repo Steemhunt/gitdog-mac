@@ -153,7 +153,7 @@ struct TreatsInfoPanel: View {
                 .foregroundStyle(Theme.creamDim)
                 .fixedSize(horizontal: false, vertical: true)
             infoLine("Available", "\(formatUsd(treats.availableUsd)) — yours, spendable", Theme.green)
-            infoLine("Pending", "\(formatUsd(treats.pendingUsd)) — releases ≤48h after the sender reads", Theme.orangeSoft)
+            infoLine("Pending", "\(formatUsd(treats.pendingUsd)) — releases ≤48h after you send (sooner if accepted)", Theme.orangeSoft)
             infoLine("Cash out", "from \(formatUsd(treats.cashoutMinUsd)) → your Base wallet (USDC)", Theme.cream)
             infoLine("Launch credits", "spend-only, don't count toward \(formatUsd(treats.cashoutMinUsd))", Theme.orangeSoft)
         }

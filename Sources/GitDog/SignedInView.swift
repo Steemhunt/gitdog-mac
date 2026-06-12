@@ -15,6 +15,9 @@ struct SignedInView: View {
     let me: APIClient.Me
     @StateObject private var store: ReviewerStore
     @State private var route: ReviewerRoute
+    /// Route that opened the breed ladder, so its back button returns there
+    /// (escaping onboarding into the inbox was a review finding).
+    @State private var ladderBack: ReviewerRoute = .inbox
 
     init(me: APIClient.Me, token: String, animator: SpriteAnimator?) {
         self.me = me
@@ -33,7 +36,7 @@ struct SignedInView: View {
             case .treats:
                 TreatsView(store: store, me: me, route: $route)
             case .ladder:
-                BreedLadderView(me: me, route: $route)
+                BreedLadderView(me: me, route: $route, backRoute: ladderBack)
             case .settings:
                 SettingsView(
                     me: me, store: store,
@@ -44,6 +47,9 @@ struct SignedInView: View {
                     route = .inbox
                 }
             }
+        }
+        .onChange(of: route) { old, new in
+            if new == .ladder { ladderBack = old }
         }
         .onAppear { store.start() }
         .onDisappear { store.stop() }
