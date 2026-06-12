@@ -110,6 +110,38 @@ struct APIClient {
 
     func treats() async throws -> Treats { try await send("GET", "/api/v1/treats") }
 
+    struct QuietHours: Codable, Equatable {
+        var start: Int      // minute-of-day [0,1440)
+        var end: Int
+        var timezone: String
+    }
+
+    struct Settings: Codable, Equatable {
+        var priceUsd: String
+        var maxRequestsPerDay: Int
+        var quietHours: QuietHours?
+    }
+
+    /// Partial update — only provided fields change (contract §settings).
+    /// `quietHours: .some(nil)` sends an explicit null to clear them.
+    func updateSettings(
+        priceUsd: Double? = nil,
+        maxRequestsPerDay: Int? = nil,
+        quietHours: QuietHours?? = nil
+    ) async throws -> Settings {
+        var body: [String: Any] = [:]
+        if let priceUsd { body["priceUsd"] = priceUsd }
+        if let maxRequestsPerDay { body["maxRequestsPerDay"] = maxRequestsPerDay }
+        if let quietHours {
+            if let qh = quietHours {
+                body["quietHours"] = ["start": qh.start, "end": qh.end, "timezone": qh.timezone]
+            } else {
+                body["quietHours"] = NSNull()
+            }
+        }
+        return try await send("POST", "/api/v1/settings", body: body)
+    }
+
     func heartbeat() async throws { let _: HeartbeatResponse = try await send("POST", "/api/v1/heartbeat") }
     private struct HeartbeatResponse: Decodable { let lastSeenAt: String }
 
