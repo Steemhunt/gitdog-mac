@@ -7,6 +7,7 @@ struct TreatsView: View {
     @ObservedObject var store: ReviewerStore
     let me: APIClient.Me
     @Binding var route: ReviewerRoute
+    @State private var showInfo = false
 
     var body: some View {
         VStack(spacing: 0) {
@@ -28,6 +29,10 @@ struct TreatsView: View {
                 .buttonStyle(.plain).foregroundStyle(Theme.cream)
             Text("TREATS").font(.custom(Theme.pixelFont, size: 12))
                 .foregroundStyle(Theme.orange)
+            Button("ⓘ") { showInfo.toggle() }
+                .buttonStyle(.plain)
+                .font(.system(size: 13))
+                .foregroundStyle(Theme.orangeSoft)
             Spacer()
             Text("Lv.\(me.level) @\(me.login)")
                 .font(.system(size: 11, design: .monospaced))
@@ -39,6 +44,7 @@ struct TreatsView: View {
     private func content(_ t: APIClient.Treats) -> some View {
         CaptureScroll {
             VStack(spacing: 14) {
+                if showInfo { TreatsInfoPanel(treats: t) }
                 VStack(spacing: 8) {
                     Text(formatUsd(t.availableUsd))
                         .font(.custom(Theme.pixelFont, size: 28))
@@ -128,5 +134,41 @@ private struct HistoryRow: View {
         // formatUsd already carries a "-" for debits; only add "+" for credits.
         let v = Double(entry.amountUsd) ?? 0
         return (v > 0 ? "+" : "") + formatUsd(entry.amountUsd)
+    }
+}
+
+/// "What are Treats?" explainer (design frame E) — copy mirrors the ledger
+/// semantics exactly: pending is escrowed and never spendable; launch credits
+/// are spend-only and excluded from the cash-out threshold.
+struct TreatsInfoPanel: View {
+    let treats: APIClient.Treats
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 7) {
+            Text("🦴 What are Treats?")
+                .font(.system(size: 12, weight: .bold))
+                .foregroundStyle(Theme.cream)
+            Text("Treats are your USDC earnings for feedback. Real money, not points.")
+                .font(.system(size: 11))
+                .foregroundStyle(Theme.creamDim)
+                .fixedSize(horizontal: false, vertical: true)
+            infoLine("Available", "\(formatUsd(treats.availableUsd)) — yours, spendable", Theme.green)
+            infoLine("Pending", "\(formatUsd(treats.pendingUsd)) — releases ≤48h after you send (sooner if accepted)", Theme.orangeSoft)
+            infoLine("Cash out", "from \(formatUsd(treats.cashoutMinUsd)) → your Base wallet (USDC)", Theme.cream)
+            infoLine("Launch credits", "spend-only, don't count toward \(formatUsd(treats.cashoutMinUsd))", Theme.orangeSoft)
+        }
+        .padding(13)
+        .background(Theme.navyCard, in: RoundedRectangle(cornerRadius: 13))
+        .overlay(RoundedRectangle(cornerRadius: 13).stroke(Theme.cream.opacity(0.07)))
+    }
+
+    private func infoLine(_ label: String, _ value: String, _ color: Color) -> some View {
+        HStack(alignment: .top) {
+            Text(label).font(.system(size: 11)).foregroundStyle(Theme.creamDim)
+            Spacer()
+            Text(value).font(.system(size: 10.5, design: .monospaced))
+                .foregroundStyle(color)
+                .multilineTextAlignment(.trailing)
+        }
     }
 }

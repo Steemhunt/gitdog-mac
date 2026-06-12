@@ -43,22 +43,48 @@ struct InboxView: View {
     @ViewBuilder
     private var content: some View {
         if store.inbox.isEmpty {
-            VStack(spacing: 10) {
-                Spacer()
-                Text("🐕")
-                    .font(.system(size: 34))
-                Text("No requests right now.")
-                    .font(.system(size: 12.5, weight: .medium))
-                    .foregroundStyle(Theme.cream)
-                Text("Keep building — bones roll in while you work.")
-                    .font(.system(size: 11))
-                    .foregroundStyle(Theme.creamDim)
-                if let error = store.loadError {
-                    Text(error).font(.system(size: 10)).foregroundStyle(Theme.red)
+            CaptureScroll {
+                VStack(spacing: 10) {
+                    if let urlString = me.breedImageUrl, let url = URL(string: urlString) {
+                        AsyncImage(url: url) { image in
+                            image.resizable().interpolation(.none).scaledToFit()
+                        } placeholder: { Text("🐕").font(.system(size: 30)) }
+                        .frame(width: 64, height: 64)
+                        .background(Theme.cream)
+                        .clipShape(RoundedRectangle(cornerRadius: 13))
+                        .padding(.top, 12)
+                    } else {
+                        Text("🐕").font(.system(size: 30)).padding(.top, 12)
+                    }
+                    Text("No bones yet — they're coming.")
+                        .font(.system(size: 13, weight: .bold))
+                        .foregroundStyle(Theme.cream)
+                    Text("Senders pick by level and activity.\nKeep shipping — your Lv.\(me.level) profile is visible.")
+                        .font(.system(size: 10.5))
+                        .foregroundStyle(Theme.creamDim)
+                        .multilineTextAlignment(.center)
+                    if let error = store.loadError {
+                        Text(error).font(.system(size: 10)).foregroundStyle(Theme.red)
+                    }
+                    VStack(spacing: 8) {
+                        BridgeCard(icon: "📤", title: "Get feedback on YOUR repo",
+                                   subtitle: "verified builders from $2 each", arrow: "↗") {
+                            WebLinks.openDashboard()
+                        }
+                        BridgeCard(icon: "📇", title: "Share your Score Card",
+                                   subtitle: "claim your launch credit", arrow: "↗") {
+                            WebLinks.openScoreCard(login: me.login)
+                        }
+                        BridgeCard(icon: "⚡", title: "Lower your price",
+                                   subtitle: "cheaper builders get picked more", arrow: "→") {
+                            route = .settings
+                        }
+                    }
+                    .padding(.top, 4)
                 }
-                Spacer()
+                .padding(.horizontal, 16)
+                .frame(maxWidth: .infinity)
             }
-            .frame(maxWidth: .infinity)
         } else {
             CaptureScroll {
                 VStack(spacing: 10) {
@@ -86,14 +112,19 @@ struct InboxView: View {
                 }
                 .buttonStyle(.plain)
             }
-            HStack(spacing: 14) {
-                Text("Lv.\(me.level) \(me.breedLabel ?? "UNRANKED")")
+            HStack(spacing: 12) {
+                Button("Lv.\(me.level) \(me.breedLabel ?? "UNRANKED")") { route = .ladder }
+                    .buttonStyle(.plain)
                     .font(.system(size: 11, design: .monospaced))
                     .foregroundStyle(Theme.orangeSoft)
                 Spacer()
-                Button("⚙ Settings") { route = .settings }
+                Button("Send a request ↗") { WebLinks.openDashboard() }
                     .buttonStyle(.plain).font(.system(size: 11))
                     .foregroundStyle(Theme.creamDim)
+                Button("⚙") { route = .settings }
+                    .buttonStyle(.plain).font(.system(size: 12))
+                    .foregroundStyle(Theme.creamDim)
+                    .help("Settings")
                 Button("Sign out") { AuthManager.shared.signOut() }
                     .buttonStyle(.plain).font(.system(size: 11))
                     .foregroundStyle(Theme.creamDim)
@@ -129,7 +160,7 @@ private struct RequestCard: View {
                 Text("·").foregroundStyle(Theme.creamDim)
                 Text(expiry).font(.system(size: 11)).foregroundStyle(Theme.creamDim)
                 Spacer()
-                Button(request.status == "reading" ? "Continue →" : "Review →", action: onReview)
+                Button(request.status == "reading" ? "Continue →" : "Check it out →", action: onReview)
                     .buttonStyle(GitDogButton(kind: .accent))
             }
         }
@@ -163,5 +194,35 @@ struct TreatsGauge: View {
             }
         }
         .frame(height: 10)
+    }
+}
+
+/// Action card used by the empty-inbox bridge (design frame D).
+struct BridgeCard: View {
+    let icon: String
+    let title: String
+    let subtitle: String
+    let arrow: String
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            HStack(spacing: 11) {
+                Text(icon).font(.system(size: 18))
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(title).font(.system(size: 12.5, weight: .semibold))
+                        .foregroundStyle(Theme.cream)
+                    Text(subtitle).font(.system(size: 10.5))
+                        .foregroundStyle(Theme.creamDim)
+                }
+                Spacer()
+                Text(arrow).font(.system(size: 13, weight: .bold))
+                    .foregroundStyle(Theme.orangeSoft)
+            }
+            .padding(.horizontal, 13).padding(.vertical, 11)
+            .background(Theme.navyCard, in: RoundedRectangle(cornerRadius: 13))
+            .overlay(RoundedRectangle(cornerRadius: 13).stroke(Theme.cream.opacity(0.07)))
+        }
+        .buttonStyle(.plain)
     }
 }

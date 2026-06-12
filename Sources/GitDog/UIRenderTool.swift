@@ -33,6 +33,11 @@ enum UIRenderTool {
                 }
                 render(SettingsView(me: me, store: store, isOnboarding: true, onDone: {}),
                        to: base.appendingPathComponent("onboarding.png"))
+                let emptyStore = PreviewStore(token: token, inbox: [], treats: treats)
+                render(InboxView(store: emptyStore, me: me, route: .constant(.inbox)),
+                       to: base.appendingPathComponent("inbox-empty.png"))
+                render(BreedLadderView(me: me, route: .constant(.ladder)),
+                       to: base.appendingPathComponent("ladder.png"))
                 print("UI rendered to \(base.path)")
             } catch {
                 print("UI render failed: \(error)")
