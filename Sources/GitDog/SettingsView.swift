@@ -12,6 +12,7 @@ struct SettingsView: View {
     let me: APIClient.Me
     @ObservedObject var store: ReviewerStore
     let isOnboarding: Bool
+    var onShowLadder: (() -> Void)? = nil
     let onDone: () -> Void
 
     @State private var price: Double = 0
@@ -88,6 +89,11 @@ struct SettingsView: View {
                 Text("Lv.\(me.level) \(me.breedLabel ?? "UNRANKED") · score \(me.score)")
                     .font(.system(size: 11.5, design: .monospaced))
                     .foregroundStyle(Theme.orangeSoft)
+                Text("what do levels mean?")
+                    .font(.system(size: 10))
+                    .foregroundStyle(Theme.creamDim)
+                    .underline()
+                    .onTapGesture { onShowLadder?() }
             }
         }
     }

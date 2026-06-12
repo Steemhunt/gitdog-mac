@@ -6,6 +6,7 @@ enum ReviewerRoute: Equatable {
     case composer(APIClient.InboxRequest)
     case treats
     case settings
+    case ladder
 }
 
 /// Container for the signed-in experience: owns the ReviewerStore and routes
@@ -31,10 +32,13 @@ struct SignedInView: View {
                 ComposerView(store: store, request: req, route: $route)
             case .treats:
                 TreatsView(store: store, me: me, route: $route)
+            case .ladder:
+                BreedLadderView(me: me, route: $route)
             case .settings:
                 SettingsView(
                     me: me, store: store,
-                    isOnboarding: !OnboardingGate.isDone(userId: me.id)
+                    isOnboarding: !OnboardingGate.isDone(userId: me.id),
+                    onShowLadder: { route = .ladder }
                 ) {
                     OnboardingGate.markDone(userId: me.id)
                     route = .inbox
