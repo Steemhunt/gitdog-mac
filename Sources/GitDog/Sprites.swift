@@ -105,7 +105,7 @@ enum Sprites {
         // body
         capsule(4.2, 5.6, 10.8, 4.8)
         // head
-        head(center: NSPoint(x: 14.2, y: 10.6), earUp: true)
+        head(center: NSPoint(x: 13.2, y: 10.6), earUp: true)
         // tail — three wag positions
         let tip: NSPoint = switch tailFrame {
         case 0: NSPoint(x: 1.0, y: 5.6)    // low
@@ -147,7 +147,7 @@ enum Sprites {
         }
         // body leans into the run
         capsule(4.0, 5.4 + bounce, 11.0, 4.6)
-        head(center: NSPoint(x: 14.6, y: 9.8 + bounce), earUp: false)
+        head(center: NSPoint(x: 13.4, y: 9.8 + bounce), earUp: false)
         // tail streams behind
         limb(from: NSPoint(x: 4.6, y: 8.2 + bounce), to: NSPoint(x: 0.8, y: 10.4 + bounce), width: 1.6)
     }
