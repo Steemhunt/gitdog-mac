@@ -31,6 +31,8 @@ enum UIRenderTool {
                     render(ComposerView(store: store, request: first, route: .constant(.composer(first))),
                            to: base.appendingPathComponent("composer.png"))
                 }
+                render(SettingsView(me: me, store: store, isOnboarding: true, onDone: {}),
+                       to: base.appendingPathComponent("onboarding.png"))
                 print("UI rendered to \(base.path)")
             } catch {
                 print("UI render failed: \(error)")

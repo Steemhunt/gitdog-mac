@@ -87,10 +87,13 @@ struct InboxView: View {
                 .buttonStyle(.plain)
             }
             HStack(spacing: 14) {
-                Text("Lv.\(me.level) \(me.breedLabel)")
+                Text("Lv.\(me.level) \(me.breedLabel ?? "UNRANKED")")
                     .font(.system(size: 11, design: .monospaced))
                     .foregroundStyle(Theme.orangeSoft)
                 Spacer()
+                Button("⚙ Settings") { route = .settings }
+                    .buttonStyle(.plain).font(.system(size: 11))
+                    .foregroundStyle(Theme.creamDim)
                 Button("Sign out") { AuthManager.shared.signOut() }
                     .buttonStyle(.plain).font(.system(size: 11))
                     .foregroundStyle(Theme.creamDim)
