@@ -25,7 +25,9 @@ struct SettingsView: View {
     @State private var error: String?
     @State private var loaded = false
 
-    private var suggestedMax: Double { Double(me.suggestedMaxUsd) ?? 20 }
+    /// Floored at 0.5 — a sub-0.5 (or unranked "0.00") max would make the
+    /// Slider's ClosedRange invalid and crash.
+    private var suggestedMax: Double { max(Double(me.suggestedMaxUsd) ?? 20, 0.5) }
 
     var body: some View {
         VStack(spacing: 0) {
@@ -83,7 +85,7 @@ struct SettingsView: View {
             VStack(alignment: .leading, spacing: 3) {
                 Text("@\(me.login)").font(.system(size: 14.5, weight: .bold))
                     .foregroundStyle(Theme.cream)
-                Text("Lv.\(me.level) \(me.breedLabel) · score \(me.score)")
+                Text("Lv.\(me.level) \(me.breedLabel ?? "UNRANKED") · score \(me.score)")
                     .font(.system(size: 11.5, design: .monospaced))
                     .foregroundStyle(Theme.orangeSoft)
             }
@@ -161,6 +163,7 @@ struct SettingsView: View {
                 do {
                     if enabled { try SMAppService.mainApp.register() }
                     else { try SMAppService.mainApp.unregister() }
+                    error = nil
                 } catch {
                     self.error = error.localizedDescription
                     syncingLogin = true
@@ -175,8 +178,13 @@ struct SettingsView: View {
     private func loadOnce() {
         guard !loaded else { return }
         loaded = true
-        price = min(Double(me.priceUsd) ?? suggestedMax * 0.7, suggestedMax)
+        // Price priority: last save on this machine (fresh) > /me (fetched at
+        // sign-in, can be stale within a session) > 70% of the suggested max.
         let saved = LocalSettings.load(userId: me.id)
+        let fromServer = me.priceUsd.flatMap(Double.init)
+        let fromLocal = saved.flatMap { Double($0.priceUsd) }
+        price = min(fromLocal ?? fromServer ?? suggestedMax * 0.7, suggestedMax)
+        price = max(price, 0.5)
         maxPerDay = saved?.maxRequestsPerDay ?? 3
         if let qh = saved?.quietHours {
             quietEnabled = true
@@ -186,6 +194,10 @@ struct SettingsView: View {
     }
 
     private func save() async {
+        if quietEnabled && quietStart == quietEnd {
+            error = "Quiet hours start and end can't be the same time."
+            return
+        }
         saving = true
         error = nil
         let quietHours: APIClient.QuietHours? = quietEnabled
@@ -209,7 +221,10 @@ struct SettingsView: View {
 /// Last-saved reviewer settings, persisted per user id so the screen can show
 /// current values until the server exposes them in /me (gitdog#67).
 enum LocalSettings {
-    private static func key(_ userId: Int) -> String { "gd.settings.\(userId)" }
+    // keyed by server host too — dev/prod ids would otherwise collide
+    private static func key(_ userId: Int) -> String {
+        "gd.settings.\(AppConfig.serverURL.host() ?? "-").\(userId)"
+    }
 
     static func save(_ settings: APIClient.Settings, userId: Int) {
         if let data = try? JSONEncoder().encode(settings) {
@@ -225,7 +240,9 @@ enum LocalSettings {
 
 /// First-run gate: has this user completed onboarding on this machine?
 enum OnboardingGate {
-    private static func key(_ userId: Int) -> String { "gd.onboarded.\(userId)" }
+    private static func key(_ userId: Int) -> String {
+        "gd.onboarded.\(AppConfig.serverURL.host() ?? "-").\(userId)"
+    }
     static func isDone(userId: Int) -> Bool { UserDefaults.standard.bool(forKey: key(userId)) }
     static func markDone(userId: Int) { UserDefaults.standard.set(true, forKey: key(userId)) }
 }

@@ -13,10 +13,12 @@ struct APIClient {
         let avatarUrl: String?
         let score: Int
         let level: Int
-        let breed: String
-        let breedLabel: String
+        /// null for unranked (level-0) users — not yet eligible reviewers
+        let breed: String?
+        let breedLabel: String?
         let breedImageUrl: String?
-        let priceUsd: String
+        /// null until the reviewer sets a price (first-run onboarding target)
+        let priceUsd: String?
         let suggestedMaxUsd: String
     }
 
