@@ -34,7 +34,10 @@ final class StatusItemController: NSObject, NSPopoverDelegate {
         popover.behavior = .transient
         popover.animates = true
         popover.delegate = self
-        popover.contentViewController = NSHostingController(rootView: PopoverRootView())
+        popover.contentViewController = NSHostingController(
+            rootView: PopoverRootView(animator: animator)
+                .preferredColorScheme(.dark)
+        )
     }
 
     func popoverDidClose(_ notification: Notification) {
@@ -56,6 +59,8 @@ final class StatusItemController: NSObject, NSPopoverDelegate {
         // popover window can't become key and keyboard input is dead.
         NSApp.activate()
         popover.contentViewController?.view.window?.makeKey()
+        // signed-in store refreshes inbox/treats on open
+        NotificationCenter.default.post(name: .gitdogPopoverDidOpen, object: nil)
     }
 
 }
