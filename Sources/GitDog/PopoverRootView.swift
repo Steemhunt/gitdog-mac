@@ -6,6 +6,7 @@ import AppKit
 /// The Inbox / composer / Treats screens replace the center section in
 /// gitdog-mac#5–#7; sign-in lands with gitdog-mac#4.
 struct PopoverRootView: View {
+    @ObservedObject private var auth = AuthManager.shared
     @State private var launchAtLogin = false
     @State private var launchAtLoginError: String?
     /// Suppresses the registration side effect while we sync UI state from
@@ -18,20 +19,47 @@ struct PopoverRootView: View {
         VStack(spacing: 0) {
             header
             Divider()
-            Spacer()
-            VStack(spacing: 8) {
-                Text("Woof. Nothing here yet —")
-                Text("sign-in arrives with the next update.")
-            }
-            .font(.system(size: 12))
-            .foregroundStyle(.secondary)
-            Spacer()
+            center
             Divider()
             footer
         }
         .frame(width: StatusItemController.popoverSize.width,
                height: StatusItemController.popoverSize.height)
         .onAppear(perform: syncFromSystem)
+    }
+
+    @ViewBuilder
+    private var center: some View {
+        switch auth.state {
+        case .signedOut, .signingIn:
+            SignInView()
+        case .signedIn(let me):
+            VStack(spacing: 10) {
+                Spacer()
+                if let urlString = me.breedImageUrl, let url = URL(string: urlString) {
+                    AsyncImage(url: url) { image in
+                        image.resizable().interpolation(.none).scaledToFit()
+                    } placeholder: {
+                        Text("🐾").font(.system(size: 28))
+                    }
+                    .frame(width: 88, height: 88)
+                    .clipShape(RoundedRectangle(cornerRadius: 14))
+                }
+                Text("@\(me.login)")
+                    .font(.system(size: 14, weight: .bold, design: .monospaced))
+                Text("Lv.\(me.level) \(me.breedLabel) · score \(me.score)")
+                    .font(.system(size: 11.5))
+                    .foregroundStyle(.secondary)
+                Text("Inbox arrives with the next update.")
+                    .font(.system(size: 11))
+                    .foregroundStyle(.tertiary)
+                Button("Sign out") { auth.signOut() }
+                    .buttonStyle(.plain)
+                    .font(.system(size: 11))
+                    .foregroundStyle(.secondary)
+                Spacer()
+            }
+        }
     }
 
     private var header: some View {

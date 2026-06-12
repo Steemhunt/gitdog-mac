@@ -33,6 +33,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         loop()
     }
 
+    func application(_ application: NSApplication, open urls: [URL]) {
+        for url in urls where url.scheme == "gitdog" {
+            AuthManager.shared.handleCallback(url)
+        }
+    }
+
     func applicationSupportsSecureRestorableState(_ app: NSApplication) -> Bool {
         true
     }

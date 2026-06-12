@@ -30,6 +30,13 @@ cat > "$APP/Contents/Info.plist" <<PLIST
   <key>CFBundleVersion</key><string>1</string>
   <key>LSMinimumSystemVersion</key><string>14.0</string>
   <key>LSUIElement</key><true/>
+  <key>CFBundleURLTypes</key>
+  <array>
+    <dict>
+      <key>CFBundleURLName</key><string>GitDog auth callback</string>
+      <key>CFBundleURLSchemes</key><array><string>gitdog</string></array>
+    </dict>
+  </array>
   <key>NSHighResolutionCapable</key><true/>
 </dict>
 </plist>
