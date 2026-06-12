@@ -61,7 +61,7 @@ enum Sprites {
     }
 
     /// Thick round-capped stroke — used for legs and tails (RunCat-style limbs).
-    private static func limb(from a: NSPoint, to b: NSPoint, width: CGFloat = 1.8) {
+    private static func limb(from a: NSPoint, to b: NSPoint, width: CGFloat = 2.1) {
         let path = NSBezierPath()
         path.move(to: a)
         path.line(to: b)
@@ -192,19 +192,26 @@ enum Sprites {
     }
 
     private static func drawSleep(zVisible: Bool) {
-        // curled mound
-        fillEllipse(2.6, 1.6, 11.8, 6.6)
-        // head resting on the near side, ear relaxed
-        fillEllipse(9.6, 4.2, 5.4, 4.6)
-        triangle(NSPoint(x: 11.4, y: 7.6),
-                 NSPoint(x: 12.2, y: 10.2),
-                 NSPoint(x: 13.8, y: 7.8))
-        // tail tucked along the front
-        limb(from: NSPoint(x: 3.4, y: 2.6), to: NSPoint(x: 7.2, y: 1.6), width: 1.6)
+        // sphinx pose: lying body with the head clearly raised — reads as a
+        // dog at 18pt where a curled mound collapsed into a blob
+        // body
+        capsule(1.6, 1.4, 12.6, 5.2)
+        // front paws stretched forward
+        capsule(9.0, 0.8, 6.4, 2.4)
+        // raised head (drowsy, ear relaxed)
+        fillEllipse(10.4, 5.6, 6.2, 5.6)
+        // snout
+        capsule(14.6, 6.8, 2.8, 2.3)
+        // relaxed ear folded back
+        triangle(NSPoint(x: 10.6, y: 9.6),
+                 NSPoint(x: 9.4, y: 12.6),
+                 NSPoint(x: 13.0, y: 10.6))
+        // tail curled around the rear
+        limb(from: NSPoint(x: 2.2, y: 3.0), to: NSPoint(x: 0.8, y: 6.4), width: 1.8)
 
         if zVisible {
-            drawZ(at: NSPoint(x: 13.6, y: 12.2), size: 2.2)
-            drawZ(at: NSPoint(x: 15.6, y: 15.2), size: 1.5)
+            drawZ(at: NSPoint(x: 12.6, y: 13.4), size: 2.4)
+            drawZ(at: NSPoint(x: 15.4, y: 16.0), size: 1.6)
         }
     }
 
