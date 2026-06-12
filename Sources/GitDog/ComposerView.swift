@@ -1,7 +1,9 @@
 import SwiftUI
 
 /// Feedback composer (design screen 2): repo card, 3 prompts, paw rating,
-/// 280-char gate, submit. Drafts persist per request id while the popover lives.
+/// 280-char gate, submit. Drafts persist per request id on the store, so a
+/// half-written review survives the transient popover dismissing (e.g. when
+/// Open Repo pulls focus away) and reopening.
 struct ComposerView: View {
     @ObservedObject var store: ReviewerStore
     let request: APIClient.InboxRequest
@@ -14,11 +16,14 @@ struct ComposerView: View {
     @State private var submitting = false
     @State private var error: String?
     @State private var didStart = false
+    @State private var didLoadDraft = false
 
     private static let minChars = 280
 
     private var totalChars: Int {
-        firstImpression.count + whatWorks.count + whatsMissing.count
+        // Match the server's JS String.length (UTF-16 code units) so the local
+        // "submittable" signal agrees with server enforcement for emoji/combining text.
+        firstImpression.utf16.count + whatWorks.utf16.count + whatsMissing.utf16.count
     }
     private var canSubmit: Bool {
         totalChars >= Self.minChars && rating >= 1 && !submitting
@@ -50,7 +55,30 @@ struct ComposerView: View {
                 .padding(16)
             }
         }
-        .task { await startReadingOnce() }
+        .task {
+            loadDraftOnce()
+            await startReadingOnce()
+        }
+        .onChange(of: firstImpression) { _, _ in persistDraft() }
+        .onChange(of: whatWorks) { _, _ in persistDraft() }
+        .onChange(of: whatsMissing) { _, _ in persistDraft() }
+        .onChange(of: rating) { _, _ in persistDraft() }
+    }
+
+    private func loadDraftOnce() {
+        guard !didLoadDraft else { return }
+        didLoadDraft = true
+        let d = store.draft(for: request.id)
+        firstImpression = d.firstImpression
+        whatWorks = d.whatWorks
+        whatsMissing = d.whatsMissing
+        rating = d.rating
+    }
+
+    private func persistDraft() {
+        guard didLoadDraft else { return }
+        store.saveDraft(.init(firstImpression: firstImpression, whatWorks: whatWorks,
+                              whatsMissing: whatsMissing, rating: rating), for: request.id)
     }
 
     private var topBar: some View {
@@ -152,6 +180,7 @@ struct ComposerView: View {
                 requestId: request.id,
                 firstImpression: firstImpression, whatWorks: whatWorks,
                 whatsMissing: whatsMissing, pawRating: rating)
+            store.clearDraft(for: request.id)
             store.updateStatus(id: request.id, status: result.status)
             store.celebrate()
             await store.refresh()

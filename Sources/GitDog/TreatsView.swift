@@ -125,7 +125,8 @@ private struct HistoryRow: View {
         }
     }
     private var amount: String {
+        // formatUsd already carries a "-" for debits; only add "+" for credits.
         let v = Double(entry.amountUsd) ?? 0
-        return (v >= 0 ? "+" : "") + formatUsd(entry.amountUsd)
+        return (v > 0 ? "+" : "") + formatUsd(entry.amountUsd)
     }
 }

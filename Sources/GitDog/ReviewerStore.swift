@@ -15,6 +15,21 @@ class ReviewerStore: ObservableObject {
     private var knownRequestIds: Set<Int> = []
     private var didInitialLoad = false
 
+    /// In-progress feedback per request id, kept on the store so a draft
+    /// survives the transient popover closing (e.g. when Open Repo pulls focus)
+    /// and reopening. Cleared when the feedback is submitted.
+    struct Draft: Equatable {
+        var firstImpression = ""
+        var whatWorks = ""
+        var whatsMissing = ""
+        var rating = 0
+    }
+    private var drafts: [Int: Draft] = [:]
+
+    func draft(for requestId: Int) -> Draft { drafts[requestId] ?? Draft() }
+    func saveDraft(_ draft: Draft, for requestId: Int) { drafts[requestId] = draft }
+    func clearDraft(for requestId: Int) { drafts[requestId] = nil }
+
     /// Polling cadence (contract rate limit is 120/min — 60s is well under).
     private static let pollInterval: TimeInterval = 60
 
@@ -64,11 +79,14 @@ class ReviewerStore: ObservableObject {
     }
 
     func refresh() async {
+        // Heartbeat is fire-and-forget presence — its failure must NOT drop the
+        // inbox/treats the user actually needs (a 429 on the shared token would
+        // otherwise blank the UI).
+        async let heartbeat: Void = (try? await api.heartbeat()) ?? ()
         do {
             async let inboxCall = api.inbox()
             async let treatsCall = api.treats()
-            async let heartbeat: Void = api.heartbeat()
-            let (newInbox, newTreats, _) = try await (inboxCall, treatsCall, heartbeat)
+            let (newInbox, newTreats) = try await (inboxCall, treatsCall)
             applyInbox(newInbox)
             treats = newTreats
             loadError = nil
@@ -77,6 +95,7 @@ class ReviewerStore: ObservableObject {
         } catch {
             loadError = error.localizedDescription
         }
+        await heartbeat
     }
 
     /// Optimistically drop a request locally after it's answered/started, so the
@@ -88,16 +107,13 @@ class ReviewerStore: ObservableObject {
     }
 
     func updateStatus(id: Int, status: String) {
-        if let idx = inbox.firstIndex(where: { $0.id == id }) {
-            var updated = inbox
-            // InboxRequest is immutable; rebuild by removing if it left the
-            // open set, otherwise leave as-is (status shown is coarse).
-            if status == "answered" || status == "accepted" || status == "flagged" {
-                updated.remove(at: idx)
-            }
-            inbox = updated
+        // A request that left the open set (answered/accepted/flagged) drops off
+        // the inbox locally before the next poll. Other statuses are coarse and
+        // need no local change — avoid a needless @Published publish.
+        if ["answered", "accepted", "flagged"].contains(status) {
+            inbox.removeAll { $0.id == id }
+            updateSpriteForInbox()
         }
-        updateSpriteForInbox()
     }
 
     private func applyInbox(_ newInbox: [APIClient.InboxRequest]) {

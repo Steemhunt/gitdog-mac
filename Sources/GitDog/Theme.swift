@@ -29,11 +29,14 @@ extension Color {
     }
 }
 
-/// Money string from the API ("7.000000") → "$7" / "$7.50" for display.
+/// Money string from the API ("7.000000") → "$7" / "$7.50" / "-$7" for display.
+/// Sign is carried OUTSIDE the dollar sign so debits read "-$7", not "$-7".
 func formatUsd(_ raw: String) -> String {
     let value = Double(raw) ?? 0
-    if value == value.rounded() {
-        return "$\(Int(value))"
+    let sign = value < 0 ? "-" : ""
+    let magnitude = abs(value)
+    if magnitude == magnitude.rounded() {
+        return "\(sign)$\(Int(magnitude))"
     }
-    return "$" + String(format: "%.2f", value)
+    return sign + "$" + String(format: "%.2f", magnitude)
 }
