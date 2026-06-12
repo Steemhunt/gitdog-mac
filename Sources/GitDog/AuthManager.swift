@@ -16,6 +16,11 @@ final class AuthManager: ObservableObject {
 
     @Published private(set) var state: State = .signedOut
     @Published var lastError: String?
+    /// Token that reached the Keychain but failed validation on a
+    /// network/server error — enables Retry without a new browser handoff.
+    @Published private(set) var retryableToken: String?
+
+    private var validateTask: Task<Void, Never>?
 
     static let shared = AuthManager()
 
@@ -23,7 +28,7 @@ final class AuthManager: ObservableObject {
         if let token = KeychainTokenStore.load() {
             // restore session; validate in the background
             state = .signingIn
-            Task { await validate(token: token) }
+            startValidation(token: token)
         }
     }
 
@@ -48,8 +53,17 @@ final class AuthManager: ObservableObject {
     }
 
     /// Entry point for the `gitdog://auth/callback` URL (from AppDelegate).
+    /// SECURITY: any local app can open gitdog:// URLs. We only accept a
+    /// callback while a sign-in WE initiated is in flight — otherwise a forged
+    /// callback could overwrite the session with an attacker's (valid) token
+    /// (login CSRF). A server-echoed state nonce is filed upstream to also
+    /// close the in-flight race window.
     func handleCallback(_ url: URL) {
         guard url.host() == "auth", url.path() == "/callback" else { return }
+        guard state == .signingIn else {
+            NSLog("GitDog: ignoring unsolicited auth callback")
+            return
+        }
         let items = URLComponents(url: url, resolvingAgainstBaseURL: false)?.queryItems ?? []
         if let error = items.first(where: { $0.name == "error" })?.value {
             state = .signedOut
@@ -69,30 +83,53 @@ final class AuthManager: ObservableObject {
             return
         }
         state = .signingIn
-        Task { await validate(token: token) }
+        startValidation(token: token)
     }
 
     func signOut() {
+        validateTask?.cancel()
+        validateTask = nil
         KeychainTokenStore.clear()
         state = .signedOut
         lastError = nil
+        retryableToken = nil
+    }
+
+    /// Re-validate a token that previously failed on a network/server error.
+    func retryValidation() {
+        guard let token = retryableToken else { return }
+        retryableToken = nil
+        state = .signingIn
+        startValidation(token: token)
+    }
+
+    private func startValidation(token: String) {
+        validateTask?.cancel()
+        validateTask = Task { await validate(token: token) }
     }
 
     /// Confirms the token against /api/v1/me and loads the profile.
     func validate(token: String) async {
         do {
             let me = try await APIClient(token: token).me()
+            guard !Task.isCancelled else { return } // signOut/cancel won the race
             state = .signedIn(me)
             lastError = nil
+            retryableToken = nil
         } catch APIClient.APIError.unauthorized {
+            guard !Task.isCancelled else { return }
             KeychainTokenStore.clear()
             state = .signedOut
             lastError = "Session expired — sign in again."
+        } catch is CancellationError {
+            return
         } catch {
-            // network/server hiccup: keep the token, surface the error,
-            // and let the user retry instead of dropping the session
+            guard !Task.isCancelled else { return }
+            // network/server hiccup: keep the token (Keychain + retryableToken)
+            // and surface a real Retry path in the UI
             state = .signedOut
             lastError = error.localizedDescription
+            retryableToken = token
         }
     }
 
@@ -101,6 +138,7 @@ final class AuthManager: ObservableObject {
         case "invalid_username": "That GitHub username doesn't look valid."
         case "user_not_found": "No GitHub user with that name."
         case "rate_limited": "Too many attempts — try again in a minute."
+        case "auth_failed": "GitHub sign-in didn't complete — try again."
         default: "Sign-in failed (\(errorCode))."
         }
     }

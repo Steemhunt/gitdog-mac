@@ -23,11 +23,7 @@ struct SignInView: View {
                     .frame(width: 220)
                     .onSubmit(submit)
                 Button(action: submit) {
-                    if auth.state == .signingIn {
-                        Text("Waiting for the browser…")
-                    } else {
-                        Text("Sign in with GitHub")
-                    }
+                    Text(auth.state == .signingIn ? "Waiting for the browser…" : "Sign in with GitHub")
                 }
                 .buttonStyle(.borderedProminent)
                 .disabled(auth.state == .signingIn)
@@ -39,6 +35,11 @@ struct SignInView: View {
                     .foregroundStyle(.red)
                     .multilineTextAlignment(.center)
                     .padding(.horizontal, 16)
+            }
+            if auth.retryableToken != nil {
+                Button("Retry") { auth.retryValidation() }
+                    .buttonStyle(.bordered)
+                    .font(.system(size: 11))
             }
             if auth.state == .signingIn {
                 Button("Cancel") { auth.signOut() }

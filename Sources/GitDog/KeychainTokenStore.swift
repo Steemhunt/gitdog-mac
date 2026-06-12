@@ -23,6 +23,7 @@ enum KeychainTokenStore {
         if update == errSecItemNotFound {
             var add = baseQuery
             add[kSecValueData as String] = data
+            add[kSecAttrAccessible as String] = kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly
             let status = SecItemAdd(add as CFDictionary, nil)
             guard status == errSecSuccess else { throw KeychainError(status) }
         } else if update != errSecSuccess {
