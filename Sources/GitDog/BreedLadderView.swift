@@ -5,9 +5,14 @@ import SwiftUI
 /// points needed to reach the next one.
 struct BreedLadderView: View {
     let me: APIClient.Me
+    /// Token to fetch the live ladder; nil → static fallback only (render harness).
+    var token: String? = nil
     @Binding var route: ReviewerRoute
     /// Where ← returns to (set by SignedInView to the route that opened the ladder).
     var backRoute: ReviewerRoute = .inbox
+
+    /// Server ladder once loaded, else the static spec mirror (#70 fallback).
+    @State private var rungs: [BreedRung] = BreedRung.ladder
 
     var body: some View {
         VStack(spacing: 0) {
@@ -20,11 +25,17 @@ struct BreedLadderView: View {
                 .fixedSize(horizontal: false, vertical: true)
             CaptureScroll {
                 VStack(spacing: 0) {
-                    ForEach(BreedRung.ladder) { rung in
+                    ForEach(rungs) { rung in
                         row(rung)
                     }
                 }
                 .padding(.vertical, 6)
+            }
+        }
+        .task(id: token) {
+            guard let token else { return }
+            if let entries = try? await APIClient(token: token).breeds(), !entries.isEmpty {
+                rungs = entries.map(BreedRung.init(from:))
             }
         }
     }
@@ -71,7 +82,7 @@ struct BreedLadderView: View {
                     .foregroundStyle(Theme.creamDim)
             }
             Spacer()
-            Text("$\(rung.maxPriceUsd)")
+            Text(formatUsd(rung.maxPriceUsd))
                 .font(.system(size: 11, design: .monospaced))
                 .foregroundStyle(Theme.green)
         }
@@ -83,7 +94,7 @@ struct BreedLadderView: View {
     }
 
     private func subtitle(_ rung: BreedRung, isMe: Bool) -> String {
-        if isMe, let next = BreedRung.ladder.first(where: { $0.level == rung.level + 1 }) {
+        if isMe, let next = rungs.first(where: { $0.level == rung.level + 1 }) {
             let delta = max(next.minScore - me.score, 0)
             return "score \(rung.minScore)+ · \(delta) pts to \(next.label)"
         }
