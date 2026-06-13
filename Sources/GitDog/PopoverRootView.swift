@@ -21,27 +21,16 @@ struct PopoverRootView: View {
                height: StatusItemController.popoverSize.height)
     }
 
+    // The sign-in hero (frame A) carries its own title, so the signed-out screen
+    // is the hero itself over a slim launch-at-login/quit footer. (Frame A's
+    // bottom-pinned ticker becomes inline above this footer — a menu-bar app
+    // still needs a reachable Quit before sign-in.)
     private var signedOutChrome: some View {
         VStack(spacing: 0) {
-            header
-            Divider()
             SignInView()
             Divider()
             LaunchAtLoginFooter()
         }
-    }
-
-    private var header: some View {
-        HStack(spacing: 8) {
-            Text("GITDOG")
-                .font(.system(size: 13, weight: .heavy, design: .monospaced))
-            Spacer()
-            Text(AppConfig.serverURL.host() ?? "—")
-                .font(.system(size: 10, design: .monospaced))
-                .foregroundStyle(.secondary)
-        }
-        .padding(.horizontal, 14)
-        .padding(.vertical, 10)
     }
 }
 

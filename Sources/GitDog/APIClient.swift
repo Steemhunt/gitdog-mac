@@ -20,6 +20,60 @@ struct APIClient {
         /// null until the reviewer sets a price (first-run onboarding target)
         let priceUsd: String?
         let suggestedMaxUsd: String
+        /// Reviewer settings — server truth as of #67 (optional: tolerate an
+        /// older deploy that predates the field).
+        let maxRequestsPerDay: Int?
+        let quietHours: QuietHours?
+        /// Score-card stats for the onboarding analysis + reveal (#70).
+        /// null until the user has a score snapshot (e.g. brand-new account).
+        let stats: ScoreCardStats?
+        /// Reviewer eligibility — drives the honest "stray pup" reveal for
+        /// unranked users (what's still needed to qualify).
+        let eligibility: Eligibility?
+    }
+
+    struct Eligibility: Decodable, Equatable {
+        let eligible: Bool
+        let reasons: [String]
+    }
+
+    /// The reveal/analysis numbers behind GET /api/v1/me (#70).
+    struct ScoreCardStats: Decodable, Equatable {
+        let githubYears: Int
+        let publicRepos: Int
+        let totalStars: Int
+        let lastPushedAt: Date?
+        /// 0–100: share of ranked builders scoring below this user.
+        let percentile: Int
+    }
+
+    /// One ladder rung from GET /api/v1/breeds (#70) — the server is the single
+    /// source of truth for thresholds/prices (reflects admin overrides), so the
+    /// app no longer mirrors the scoring spec client-side.
+    struct BreedLadderEntry: Decodable, Equatable, Identifiable {
+        let level: Int
+        let breed: String
+        let label: String
+        let minScore: Int
+        let maxPriceUsd: String
+        let imageUrl: String
+        var id: Int { level }
+    }
+
+    /// Unauthenticated social-proof for the sign-in hero (#70). Payouts are
+    /// anonymized to breed + level by the server — never a login.
+    struct PublicStats: Decodable, Equatable {
+        let builders: Int
+        let paidThisWeekUsd: String
+        let recentPayouts: [RecentPayout]
+
+        struct RecentPayout: Decodable, Equatable, Identifiable {
+            let breedLabel: String?
+            let level: Int
+            let amountUsd: String
+            let ago: String
+            var id: String { "\(level)-\(ago)-\(amountUsd)" }
+        }
     }
 
     struct InboxRequest: Decodable, Equatable, Identifiable {
@@ -111,6 +165,27 @@ struct APIClient {
     }
 
     func treats() async throws -> Treats { try await send("GET", "/api/v1/treats") }
+
+    /// The breed ladder as server data (#70). The app uses this as the source of
+    /// truth for the ladder sheet, falling back to the static spec mirror on error.
+    func breeds() async throws -> [BreedLadderEntry] {
+        let response: BreedsResponse = try await send("GET", "/api/v1/breeds")
+        return response.breeds
+    }
+    private struct BreedsResponse: Decodable { let breeds: [BreedLadderEntry] }
+
+    /// Public social-proof for the sign-in hero (#70). Unauthenticated — no token
+    /// needed, so it loads on the signed-out screen. Static (not an instance
+    /// method): the hero shows before any session exists.
+    static func publicStats() async throws -> PublicStats {
+        let request = URLRequest(url: AppConfig.serverURL.appending(path: "/api/stats/public"))
+        let (data, response) = try await URLSession.shared.data(for: request)
+        guard (response as? HTTPURLResponse)?.statusCode == 200 else {
+            throw APIError.server(status: (response as? HTTPURLResponse)?.statusCode ?? 0,
+                                  message: "stats unavailable")
+        }
+        return try decoder.decode(PublicStats.self, from: data)
+    }
 
     struct QuietHours: Codable, Equatable {
         var start: Int      // minute-of-day [0,1440)

@@ -5,9 +5,9 @@ import ServiceManagement
 /// screen — design screen 4: price slider capped at the level's suggested max,
 /// daily cap, quiet hours, launch-at-login.
 ///
-/// Server truth gap: /api/v1/me doesn't return maxRequestsPerDay/quietHours yet
-/// (filed Steemhunt/gitdog#67), so last-saved values persist locally per user
-/// and the price initializes from `me.priceUsd` (which IS server truth).
+/// /api/v1/me returns price, maxRequestsPerDay and quietHours (server truth as of
+/// #67); a local last-saved copy still takes priority within a session so an
+/// edit shows immediately without waiting for the next /me fetch.
 struct SettingsView: View {
     let me: APIClient.Me
     @ObservedObject var store: ReviewerStore
@@ -98,24 +98,35 @@ struct SettingsView: View {
         }
     }
 
+    /// A real slider needs a positive span over the 0.5 floor. Unranked users
+    /// (suggestedMax "0.00" → 0.5) have none — a 0.5...0.5 range crashes Slider
+    /// ("max stride must be positive"), so we hide pricing for them entirely.
+    private var canPrice: Bool { suggestedMax > 0.5 }
+
     private var priceSection: some View {
         VStack(alignment: .leading, spacing: 8) {
-            HStack {
-                Text("Per feedback you'll earn")
-                    .font(.system(size: 12.5)).foregroundStyle(Theme.creamDim)
-                Spacer()
-                Text(String(format: "$%.2f", price))
-                    .font(.system(size: 15, weight: .bold, design: .monospaced))
-                    .foregroundStyle(Theme.green)
+            if canPrice {
+                HStack {
+                    Text("Per feedback you'll earn")
+                        .font(.system(size: 12.5)).foregroundStyle(Theme.creamDim)
+                    Spacer()
+                    Text(String(format: "$%.2f", price))
+                        .font(.system(size: 15, weight: .bold, design: .monospaced))
+                        .foregroundStyle(Theme.green)
+                }
+                Slider(value: $price, in: 0.5...suggestedMax, step: 0.5)
+                    .tint(Theme.orange)
+                HStack {
+                    Text("lower price → more requests")
+                    Spacer()
+                    Text("suggested max \(formatUsd(me.suggestedMaxUsd))")
+                }
+                .font(.system(size: 10.5)).foregroundStyle(Theme.creamDim)
+            } else {
+                Text("Pricing unlocks once you're ranked (Lv.1+). Keep shipping on GitHub to earn your first breed.")
+                    .font(.system(size: 12)).foregroundStyle(Theme.creamDim)
+                    .fixedSize(horizontal: false, vertical: true)
             }
-            Slider(value: $price, in: 0.5...suggestedMax, step: 0.5)
-                .tint(Theme.orange)
-            HStack {
-                Text("lower price → more requests")
-                Spacer()
-                Text("suggested max \(formatUsd(me.suggestedMaxUsd))")
-            }
-            .font(.system(size: 10.5)).foregroundStyle(Theme.creamDim)
         }
     }
 
@@ -184,15 +195,15 @@ struct SettingsView: View {
     private func loadOnce() {
         guard !loaded else { return }
         loaded = true
-        // Price priority: last save on this machine (fresh) > /me (fetched at
-        // sign-in, can be stale within a session) > 70% of the suggested max.
+        // Field priority everywhere: last save on this machine (fresh) > /me
+        // (server truth fetched at sign-in, incl. settings as of #67) > default.
         let saved = LocalSettings.load(userId: me.id)
         let fromServer = me.priceUsd.flatMap(Double.init)
         let fromLocal = saved.flatMap { Double($0.priceUsd) }
         price = min(fromLocal ?? fromServer ?? suggestedMax * 0.7, suggestedMax)
         price = max(price, 0.5)
-        maxPerDay = saved?.maxRequestsPerDay ?? 3
-        if let qh = saved?.quietHours {
+        maxPerDay = saved?.maxRequestsPerDay ?? me.maxRequestsPerDay ?? 3
+        if let qh = saved?.quietHours ?? me.quietHours {
             quietEnabled = true
             quietStart = qh.start
             quietEnd = qh.end
@@ -211,7 +222,7 @@ struct SettingsView: View {
             : nil
         do {
             let settings = try await store.client.updateSettings(
-                priceUsd: price,
+                priceUsd: canPrice ? price : nil,   // unranked users have no price to set
                 maxRequestsPerDay: maxPerDay,
                 quietHours: .some(quietHours)
             )
@@ -224,8 +235,8 @@ struct SettingsView: View {
     }
 }
 
-/// Last-saved reviewer settings, persisted per user id so the screen can show
-/// current values until the server exposes them in /me (gitdog#67).
+/// Last-saved reviewer settings, persisted per user id so an edit shows
+/// immediately on this machine (server truth also arrives via /me, #67).
 enum LocalSettings {
     // keyed by server host too — dev/prod ids would otherwise collide
     private static func key(_ userId: Int) -> String {

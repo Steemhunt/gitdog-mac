@@ -13,36 +13,58 @@ enum UIRenderTool {
         else { return }
 
         UIRenderMode.active = true  // swap ScrollView→VStack so offscreen capture sees content
-        Task {
-            let base = URL(fileURLWithPath: dir, isDirectory: true)
-            try? FileManager.default.createDirectory(at: base, withIntermediateDirectories: true)
-            let api = APIClient(token: token)
-            do {
-                let me = try await api.me()
-                let inbox = try await api.inbox()
-                let treats = try await api.treats()
 
-                let store = PreviewStore(token: token, inbox: inbox, treats: treats)
-                render(InboxView(store: store, me: me, route: .constant(.inbox)),
-                       to: base.appendingPathComponent("inbox.png"))
-                render(TreatsView(store: store, me: me, route: .constant(.treats)),
-                       to: base.appendingPathComponent("treats.png"))
-                if let first = inbox.first {
-                    render(ComposerView(store: store, request: first, route: .constant(.composer(first))),
-                           to: base.appendingPathComponent("composer.png"))
-                }
-                render(SettingsView(me: me, store: store, isOnboarding: true, onDone: {}),
-                       to: base.appendingPathComponent("onboarding.png"))
-                let emptyStore = PreviewStore(token: token, inbox: [], treats: treats)
-                render(InboxView(store: emptyStore, me: me, route: .constant(.inbox)),
-                       to: base.appendingPathComponent("inbox-empty.png"))
-                render(BreedLadderView(me: me, route: .constant(.ladder)),
-                       to: base.appendingPathComponent("ladder.png"))
-                print("UI rendered to \(base.path)")
-            } catch {
-                print("UI render failed: \(error)")
+        // The render work is async (it fetches real data), so it must live in a
+        // Task. But this runs in main() BEFORE NSApplication.run(), and a bare
+        // Task scheduled here never drains — its main-actor executor isn't
+        // serviced until the app's run loop spins. So we pump RunLoop.main here
+        // until the work signals done, then exit (mirroring the synchronous
+        // sprite harness, which never reaches app.run() either).
+        var done = false
+        Task { @MainActor in
+            await renderAll(dir: dir, token: token)
+            done = true
+        }
+        while !done {
+            RunLoop.main.run(mode: .default, before: Date().addingTimeInterval(0.05))
+        }
+        exit(0)
+    }
+
+    private static func renderAll(dir: String, token: String) async {
+        let base = URL(fileURLWithPath: dir, isDirectory: true)
+        try? FileManager.default.createDirectory(at: base, withIntermediateDirectories: true)
+        let api = APIClient(token: token)
+        do {
+            let me = try await api.me()
+            let inbox = try await api.inbox()
+            let treats = try await api.treats()
+
+            let store = PreviewStore(token: token, inbox: inbox, treats: treats)
+            render(InboxView(store: store, me: me, route: .constant(.inbox)),
+                   to: base.appendingPathComponent("inbox.png"))
+            render(TreatsView(store: store, me: me, route: .constant(.treats)),
+                   to: base.appendingPathComponent("treats.png"))
+            if let first = inbox.first {
+                render(ComposerView(store: store, request: first, route: .constant(.composer(first))),
+                       to: base.appendingPathComponent("composer.png"))
             }
-            exit(0)
+            render(SettingsView(me: me, store: store, isOnboarding: true, onDone: {}),
+                   to: base.appendingPathComponent("onboarding.png"))
+            let emptyStore = PreviewStore(token: token, inbox: [], treats: treats)
+            render(InboxView(store: emptyStore, me: me, route: .constant(.inbox)),
+                   to: base.appendingPathComponent("inbox-empty.png"))
+            render(BreedLadderView(me: me, token: token, route: .constant(.ladder)),
+                   to: base.appendingPathComponent("ladder.png"))
+            // SignInView is intentionally not rendered here: its social proof and
+            // payout ticker are .task-driven, which ImageRenderer's synchronous
+            // snapshot can't run, so the capture would only show the static
+            // skeleton. Verify the hero in the live menu bar instead.
+            render(RevealView(me: me, onSetPrice: {}, onContinue: {}),
+                   to: base.appendingPathComponent("reveal.png"))
+            print("UI rendered to \(base.path)")
+        } catch {
+            print("UI render failed: \(error)")
         }
     }
 
