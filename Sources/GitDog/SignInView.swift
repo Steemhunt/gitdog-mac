@@ -32,7 +32,18 @@ struct SignInView: View {
             payoutTicker
         }
         .padding(.top, 14)
-        .task { stats = try? await APIClient.publicStats() }
+        .task {
+            stats = try? await APIClient.publicStats()
+            // Rotate the payout ticker from here (not a Timer.publish in the body,
+            // which would resubscribe and drift on every tick). Cancelled with the
+            // view when it disappears.
+            guard let count = stats?.recentPayouts.count, count > 1 else { return }
+            while !Task.isCancelled {
+                try? await Task.sleep(for: .seconds(3))
+                if Task.isCancelled { return }
+                withAnimation(.easeInOut(duration: 0.4)) { tickerIndex += 1 }
+            }
+        }
     }
 
     private var heroDog: some View {
@@ -137,9 +148,6 @@ struct SignInView: View {
                 .padding(.bottom, 12)
                 .transition(.opacity)
                 .id(tickerIndex)
-                .onReceive(Timer.publish(every: 3, on: .main, in: .common).autoconnect()) { _ in
-                    withAnimation(.easeInOut(duration: 0.4)) { tickerIndex += 1 }
-                }
         }
     }
 

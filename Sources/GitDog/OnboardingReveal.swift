@@ -26,7 +26,10 @@ struct AnalyzingView: View {
             out.append(yearsLine(s.githubYears))
             out.append("\(s.publicRepos) public repos, ★\(s.totalStars) counted")
             if let pushed = s.lastPushedAt {
-                out.append("Pushed code \(relativeAgo(pushed)) ago — still shipping")
+                // "still shipping" only rings true for a recent push; older ones
+                // just state the fact without the cheer.
+                let recent = -pushed.timeIntervalSinceNow < 90 * 24 * 3600
+                out.append("Pushed code \(relativeAgo(pushed)) ago\(recent ? " — still shipping" : "")")
             }
         } else {
             out.append("No score snapshot yet — sniffing your public work")
@@ -126,6 +129,10 @@ struct RevealView: View {
     let onContinue: () -> Void
 
     private var isRanked: Bool { me.level >= 1 }
+    /// Whether the price screen has a real range to offer — mirrors
+    /// SettingsView.canPrice so a ranked user with no usable price range isn't
+    /// sent to a "pricing locked" screen that contradicts their breed reveal.
+    private var canPrice: Bool { (Double(me.suggestedMaxUsd) ?? 0) > 0.5 }
 
     var body: some View {
         CaptureScroll {
@@ -205,8 +212,13 @@ struct RevealView: View {
             .padding(.top, 12)
 
         VStack(spacing: 8) {
-            Button("Set my price & start earning →", action: onSetPrice)
-                .buttonStyle(GitDogButton(kind: .accent, fullWidth: true))
+            if canPrice {
+                Button("Set my price & start earning →", action: onSetPrice)
+                    .buttonStyle(GitDogButton(kind: .accent, fullWidth: true))
+            } else {
+                Button("Start earning →", action: onContinue)
+                    .buttonStyle(GitDogButton(kind: .accent, fullWidth: true))
+            }
             Button("Share my Score Card ↗") { WebLinks.openScoreCard(login: me.login) }
                 .buttonStyle(GitDogButton(kind: .ghost, fullWidth: true))
         }
