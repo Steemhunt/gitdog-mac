@@ -3,11 +3,37 @@ import AppKit
 @MainActor
 final class AppDelegate: NSObject, NSApplicationDelegate {
     private var statusController: StatusItemController?
+    private var hotKey: GlobalHotKey?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         statusController = StatusItemController()
         NSLog("GitDog launched — server: \(AppConfig.serverURL.absoluteString)")
+        refreshHotKeyRegistration()
         startSpriteDemoIfRequested()
+    }
+
+    /// Dock/Spotlight re-launch of the running menu-bar app (no windows) →
+    /// surface the popover. Returning true tells AppKit we handled the reopen.
+    func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows: Bool) -> Bool {
+        statusController?.openPopover()
+        return true
+    }
+
+    func applicationWillTerminate(_ notification: Notification) {
+        hotKey?.unregister()
+    }
+
+    /// Register/unregister the global hotkey to match the (app-wide) preference.
+    /// Called at launch and whenever the Settings toggle flips at runtime.
+    func refreshHotKeyRegistration() {
+        if HotKeyPreference.enabled {
+            if hotKey == nil {
+                hotKey = GlobalHotKey { [weak self] in self?.statusController?.togglePopover() }
+            }
+            hotKey?.register()
+        } else {
+            hotKey?.unregister()
+        }
     }
 
     /// Dev QA: `GITDOG_SPRITE_DEMO=1` cycles the menu bar dog through every
