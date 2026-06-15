@@ -27,7 +27,7 @@ struct TreatsView: View {
         HStack(spacing: 10) {
             Button { route = .inbox } label: { Text("←").font(.system(size: 15)) }
                 .buttonStyle(.plain).foregroundStyle(Theme.cream)
-            Text("TREATS").font(.custom(Theme.pixelFont, size: 12))
+            Text("TREATS").font(.custom(Theme.pixelFont, size: 11))
                 .foregroundStyle(Theme.orange)
             Button("ⓘ") { showInfo.toggle() }
                 .buttonStyle(.plain)
@@ -68,7 +68,7 @@ struct TreatsView: View {
                             .foregroundStyle(Theme.orangeSoft)
                     }
                     .padding(11)
-                    .background(Theme.navyCard, in: RoundedRectangle(cornerRadius: 11))
+                    .background(Theme.navyCard, in: RoundedRectangle(cornerRadius: 13))
                 }
 
                 if !t.history.isEmpty {
@@ -87,8 +87,8 @@ struct TreatsView: View {
                         .font(.system(size: 12.5, weight: .semibold))
                         .foregroundStyle(Theme.creamDim)
                         .frame(maxWidth: .infinity).padding(12)
-                        .background(Theme.navyCard, in: RoundedRectangle(cornerRadius: 11))
-                        .overlay(RoundedRectangle(cornerRadius: 11)
+                        .background(Theme.navyCard, in: RoundedRectangle(cornerRadius: 13))
+                        .overlay(RoundedRectangle(cornerRadius: 13)
                             .strokeBorder(Theme.cream.opacity(0.2), style: StrokeStyle(dash: [4])))
                 }
             }

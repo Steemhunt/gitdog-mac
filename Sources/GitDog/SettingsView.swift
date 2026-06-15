@@ -108,7 +108,7 @@ struct SettingsView: View {
             if canPrice {
                 HStack {
                     Text("Per feedback you'll earn")
-                        .font(.system(size: 12.5)).foregroundStyle(Theme.creamDim)
+                        .font(.system(size: 13)).foregroundStyle(Theme.creamDim)
                     Spacer()
                     Text(String(format: "$%.2f", price))
                         .font(.system(size: 15, weight: .bold, design: .monospaced))

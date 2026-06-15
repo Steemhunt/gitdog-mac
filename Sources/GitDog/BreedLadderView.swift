@@ -45,8 +45,9 @@ struct BreedLadderView: View {
             Button { route = backRoute } label: { Text("←").font(.system(size: 15)) }
                 .buttonStyle(.plain).foregroundStyle(Theme.cream)
             Text("THE BREED LADDER")
-                .font(.custom(Theme.pixelFont, size: 10))
+                .font(.custom(Theme.pixelFont, size: 11))
                 .foregroundStyle(Theme.orange)
+                .minimumScaleFactor(0.85).lineLimit(1)
             Spacer()
         }
         .padding(.horizontal, 14).padding(.vertical, 11)
@@ -86,7 +87,7 @@ struct BreedLadderView: View {
                 .font(.system(size: 11, design: .monospaced))
                 .foregroundStyle(Theme.green)
         }
-        .padding(.horizontal, 16).padding(.vertical, 7)
+        .padding(.horizontal, 16).padding(.vertical, 8)
         .background(isMe ? Theme.orange.opacity(0.1) : .clear)
         .overlay(alignment: .leading) {
             if isMe { Rectangle().fill(Theme.orange).frame(width: 3) }
