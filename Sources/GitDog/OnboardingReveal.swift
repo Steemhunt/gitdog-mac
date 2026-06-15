@@ -143,7 +143,7 @@ struct RevealView: View {
                     .tracking(1).padding(.top, 18)
 
                 Text(isRanked ? "YOU'RE A\n\(breedName)!" : "STILL A\nSTRAY PUP")
-                    .font(.custom(Theme.pixelFont, size: 15))
+                    .font(.custom(Theme.pixelFont, size: 17))
                     .foregroundStyle(Theme.orange)
                     .multilineTextAlignment(.center)
                     .lineLimit(2)
@@ -182,7 +182,7 @@ struct RevealView: View {
                         .font(.custom(Theme.pixelFont, size: 9))
                         .foregroundStyle(Theme.navy)
                         .padding(.horizontal, 8).padding(.vertical, 6)
-                        .background(Theme.orange, in: RoundedRectangle(cornerRadius: 7))
+                        .background(Theme.orange, in: RoundedRectangle(cornerRadius: 8))
                         .offset(x: -8, y: -8)
                 }
             } else {
@@ -224,7 +224,7 @@ struct RevealView: View {
         }
         .padding(.horizontal, 24).padding(.top, 14)
 
-        Text("share → claim your $10 launch credit")
+        Text("share → claim up to $50 launch credit")
             .font(.system(size: 10.5)).foregroundStyle(Theme.orangeSoft).padding(.top, 8)
     }
 
@@ -246,8 +246,8 @@ struct RevealView: View {
                 }
             }
             .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(13).padding(.horizontal, 4)
-            .background(Theme.navyCard, in: RoundedRectangle(cornerRadius: 12))
+            .padding(13)
+            .background(Theme.navyCard, in: RoundedRectangle(cornerRadius: 13))
             .padding(.horizontal, 24).padding(.top, 12)
         }
 
