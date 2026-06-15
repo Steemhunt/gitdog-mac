@@ -44,6 +44,7 @@ private struct LaunchAtLoginFooter: View {
     /// after a failed register() re-fires onChange and runs an unintended
     /// unregister(), masking the real error.
     @State private var syncingToggle = false
+    @State private var hotkeyEnabled = HotKeyPreference.enabled
 
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
@@ -53,6 +54,15 @@ private struct LaunchAtLoginFooter: View {
                 .onChange(of: launchAtLogin) { _, enabled in
                     guard !syncingToggle else { return }
                     setLaunchAtLogin(enabled)
+                }
+            // Reachable while signed out: the hotkey is the way back in if the
+            // menu bar icon is hidden behind the notch (#29).
+            Toggle("Global shortcut (\(GlobalHotKey.displayLabel))", isOn: $hotkeyEnabled)
+                .font(.system(size: 12))
+                .toggleStyle(.checkbox)
+                .onChange(of: hotkeyEnabled) { _, on in
+                    HotKeyPreference.enabled = on
+                    (NSApp.delegate as? AppDelegate)?.refreshHotKeyRegistration()
                 }
             if let error = launchAtLoginError {
                 Text(error).font(.system(size: 10)).foregroundStyle(.red)

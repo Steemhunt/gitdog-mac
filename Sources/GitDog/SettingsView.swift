@@ -1,5 +1,6 @@
 import SwiftUI
 import ServiceManagement
+import AppKit
 
 /// Onboarding (first sign-in) and Settings (from the Inbox footer) share this
 /// screen — design screen 4: price slider capped at the level's suggested max,
@@ -21,6 +22,7 @@ struct SettingsView: View {
     @State private var quietStart = 23 * 60   // 11pm
     @State private var quietEnd = 8 * 60      // 8am
     @State private var launchAtLogin = SMAppService.mainApp.status == .enabled
+    @State private var hotkeyEnabled = HotKeyPreference.enabled
     @State private var syncingLogin = false
     @State private var saving = false
     @State private var error: String?
@@ -41,6 +43,7 @@ struct SettingsView: View {
                     stepperRow
                     quietSection
                     loginToggle
+                    hotkeyToggle
                     if let error {
                         Text(error).font(.system(size: 11)).foregroundStyle(Theme.red)
                     }
@@ -188,6 +191,22 @@ struct SettingsView: View {
                     syncingLogin = false
                 }
             }
+    }
+
+    /// Global shortcut to open GitDog from anywhere — the reliable way in when
+    /// the menu bar icon is hidden behind the notch (#29).
+    private var hotkeyToggle: some View {
+        VStack(alignment: .leading, spacing: 2) {
+            Toggle("Global shortcut (\(GlobalHotKey.displayLabel))", isOn: $hotkeyEnabled)
+                .font(.system(size: 13)).foregroundStyle(Theme.cream)
+                .toggleStyle(.switch).tint(Theme.orange)
+                .onChange(of: hotkeyEnabled) { _, on in
+                    HotKeyPreference.enabled = on
+                    (NSApp.delegate as? AppDelegate)?.refreshHotKeyRegistration()
+                }
+            Text("Opens GitDog even when the menu bar icon is hidden.")
+                .font(.system(size: 10.5)).foregroundStyle(Theme.creamDim)
+        }
     }
 
     // MARK: load/save
