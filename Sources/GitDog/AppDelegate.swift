@@ -9,7 +9,22 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         statusController = StatusItemController()
         NSLog("GitDog launched — server: \(AppConfig.serverURL.absoluteString)")
         refreshHotKeyRegistration()
+        maybeRunFirstRunMoment()
         startSpriteDemoIfRequested()
+    }
+
+    /// First launch only (#30): auto-open the popover and flag the one-time
+    /// coachmark so a new user immediately sees the app and learns where it
+    /// lives + how to reopen it. Deferred one run-loop tick so the just-created
+    /// status item has laid out before openPopover()'s occlusion check runs.
+    private func maybeRunFirstRunMoment() {
+        guard !FirstRunPref.seen else { return }
+        FirstRunPref.seen = true
+        DispatchQueue.main.async { [weak self] in
+            guard let self else { return }
+            CoachmarkState.shared.showFirstRun = true
+            self.statusController?.openPopover()
+        }
     }
 
     /// Dock/Spotlight re-launch of the running menu-bar app (no windows) →

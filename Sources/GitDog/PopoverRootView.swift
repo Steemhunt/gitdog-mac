@@ -8,6 +8,7 @@ import AppKit
 struct PopoverRootView: View {
     let animator: SpriteAnimator?
     @ObservedObject private var auth = AuthManager.shared
+    @ObservedObject private var coach = CoachmarkState.shared
 
     var body: some View {
         Group {
@@ -19,6 +20,30 @@ struct PopoverRootView: View {
         }
         .frame(width: StatusItemController.popoverSize.width,
                height: StatusItemController.popoverSize.height)
+        .overlay(alignment: .top) {
+            if coach.showFirstRun { coachmarkBanner }
+        }
+        .animation(.easeInOut(duration: 0.25), value: coach.showFirstRun)
+    }
+
+    /// One-time first-run coachmark (#30): names the menu bar + the global
+    /// shortcut so a new user knows where the app lives and how to reopen it.
+    private var coachmarkBanner: some View {
+        HStack(spacing: 8) {
+            Text("🐶 GitDog lives in your menu bar — reopen it anytime with \(GlobalHotKey.displayLabel)")
+                .font(.system(size: 11, weight: .medium))
+                .foregroundStyle(Theme.navy)
+                .fixedSize(horizontal: false, vertical: true)
+            Spacer(minLength: 6)
+            Button { coach.showFirstRun = false } label: {
+                Image(systemName: "xmark").font(.system(size: 10, weight: .bold))
+            }
+            .buttonStyle(.plain).foregroundStyle(Theme.navy)
+        }
+        .padding(.horizontal, 12).padding(.vertical, 9)
+        .background(Theme.orange, in: RoundedRectangle(cornerRadius: 11))
+        .padding(8)
+        .transition(.move(edge: .top).combined(with: .opacity))
     }
 
     // The sign-in hero (frame A) carries its own title, so the signed-out screen

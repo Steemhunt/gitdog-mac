@@ -79,6 +79,9 @@ final class StatusItemController: NSObject, NSPopoverDelegate {
         lastCloseAt = Date()
         fallbackWindow?.orderOut(nil)
         fallbackWindow = nil
+        // First-run coachmark is a once-only nudge — don't let it return on the
+        // next open within the same session.
+        CoachmarkState.shared.showFirstRun = false
     }
 
     // MARK: button path (keeps the transient-close guard)
