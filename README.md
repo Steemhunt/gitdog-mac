@@ -11,25 +11,44 @@ talks only to the gitdog server's versioned `/api/v1`
 
 ## Build & run (no Xcode required)
 
-Requires macOS 14+ and Swift 6 command line tools.
+Requires macOS 14+ and Swift 6 command line tools (`xcode-select --install`).
 
 ```bash
-# dev loop
-swift build && swift run            # status item appears; popover on click
+# UI dev loop — status item appears, popover on click.
+# No app bundle, so the gitdog:// scheme isn't registered: fine for tweaking
+# views, but sign-in can't complete this way.
+swift build && swift run
 
-# bundled app (needed for launch-at-login; the gitdog:// URL scheme
-# is registered when sign-in lands in #4)
+# Full bundled app — registers the gitdog:// auth callback + launch-at-login.
+# Use this for anything involving sign-in.
 ./scripts/make-app.sh release
 open dist/GitDog.app
 ```
 
-Point at a non-default server with `GITDOG_SERVER` (absolute http(s) URL).
-Note: `open` does not pass your shell's environment — for the bundled build,
-launch the binary directly:
+Point at a non-default server with `GITDOG_SERVER` (absolute http(s) URL). Bake
+it into the bundle at build time, then launch normally — `open` does not forward
+your shell environment, so the bake is what makes it stick:
 
 ```bash
-GITDOG_SERVER=http://localhost:3000 dist/GitDog.app/Contents/MacOS/GitDog
+GITDOG_SERVER=https://your-server.example.com ./scripts/make-app.sh
+open dist/GitDog.app
 ```
+
+### Joining a test session
+
+For a shared pre-deploy test, the host runs the server behind a tunnel and
+shares its URL. Build against it and launch:
+
+```bash
+git clone https://github.com/Steemhunt/gitdog-mac && cd gitdog-mac
+GITDOG_SERVER=<tunnel-url-from-host> ./scripts/make-app.sh
+open dist/GitDog.app          # pixel dog appears in the menu bar
+```
+
+Click the dog → enter your GitHub username → the browser hands you back to the
+app and your real breed is revealed. A locally built app isn't quarantined, so
+Gatekeeper won't get in the way (no signing needed). If the host's tunnel URL
+changes, re-run the last two commands with the new URL.
 
 ## Architecture
 
@@ -39,14 +58,21 @@ GITDOG_SERVER=http://localhost:3000 dist/GitDog.app/Contents/MacOS/GitDog
 | `AppDelegate.swift` | app lifecycle |
 | `StatusItemController.swift` | menu bar item, template icon, popover anchoring |
 | `PopoverRootView.swift` | SwiftUI popover content |
-| `AppConfig.swift` | server URL + version |
+| `AppConfig.swift` | server URL (`GITDOG_SERVER` override) + version |
+| `AuthManager.swift` | sign-in lifecycle, `gitdog://` callback, Keychain session |
+| `SignInView.swift` / `OnboardingReveal.swift` | sign-in hero, analyze→breed reveal |
+| `InboxView.swift` / `ComposerView.swift` / `TreatsView.swift` | reviewer surfaces |
+| `BreedLadderView.swift` | breed ladder (from `/api/v1/breeds`) |
+| `Sprites.swift` / `SpriteAnimator.swift` | menu bar dog animation |
 | `scripts/make-app.sh` | SwiftPM build → `dist/GitDog.app` bundle (CLT-only) |
 
-Design reference (brand tokens, popover specs at 360px, sprite strips):
-`design/` in the [server repo](https://github.com/Steemhunt/gitdog).
+Design lives in the team's `z-design/gitdog-design` package (brand tokens,
+popover specs at 360px, breed art), not in this repo. Runtime breed images are
+served by the server from `public/breeds`.
 
 ## Status
 
-Scaffold (#2). Upcoming: animated sprite states (#3), GitHub sign-in via
-`gitdog://` handoff (#4), Inbox (#5), feedback composer (#6), Treats (#7),
-onboarding (#8), signed DMG (#9).
+Reviewer experience is built: sign-in handoff, analyze→breed reveal onboarding,
+Inbox, feedback composer, Treats, breed ladder, animated menu bar sprite.
+Remaining before public release: signed/notarized DMG (#9) and the production
+auth/deploy gates on the server side.
