@@ -21,18 +21,37 @@ final class AuthManager: ObservableObject {
     @Published private(set) var retryableToken: String?
 
     private var validateTask: Task<Void, Never>?
+    /// In-memory copy of the session token. The UI reads this (never the
+    /// Keychain) so rendering never triggers a synchronous Keychain access —
+    /// which, on an unsigned build, can pop a blocking authorization prompt.
+    private var cachedToken: String?
 
     static let shared = AuthManager()
 
     private init() {
-        if let token = KeychainTokenStore.load() {
-            // restore session; validate in the background
-            state = .signingIn
-            startValidation(token: token)
-        }
+        // Restore the session OFF the launch path (#33). The Keychain read is
+        // synchronous and, on an unsigned build, can present a blocking prompt;
+        // doing it in init would freeze app launch (status item, hotkey, the
+        // first-run moment) until the user answers. Stay .signedOut until the
+        // background restore resolves.
+        Task { await restoreSession() }
     }
 
-    var token: String? { KeychainTokenStore.load() }
+    /// The session token, from memory only (set on restore / sign-in). Never
+    /// hits the Keychain, so callers on the main thread can't be blocked.
+    var token: String? { cachedToken }
+
+    /// Load any persisted token off the main actor (the Keychain read may block
+    /// on a prompt) and, if present, validate it. No token → stays signed out.
+    private func restoreSession() async {
+        let token = await Task.detached(priority: .userInitiated) {
+            KeychainTokenStore.load()
+        }.value
+        guard let token else { return }
+        cachedToken = token
+        state = .signingIn
+        startValidation(token: token)
+    }
 
     /// Opens the server's auth handoff page in the default browser.
     /// The flow completes when the server redirects to gitdog://auth/callback.
@@ -82,6 +101,7 @@ final class AuthManager: ObservableObject {
             lastError = "Couldn't store the session: \(error.localizedDescription)"
             return
         }
+        cachedToken = token
         state = .signingIn
         startValidation(token: token)
     }
@@ -90,6 +110,7 @@ final class AuthManager: ObservableObject {
         validateTask?.cancel()
         validateTask = nil
         KeychainTokenStore.clear()
+        cachedToken = nil
         state = .signedOut
         lastError = nil
         retryableToken = nil
@@ -119,6 +140,7 @@ final class AuthManager: ObservableObject {
         } catch APIClient.APIError.unauthorized {
             guard !Task.isCancelled else { return }
             KeychainTokenStore.clear()
+            cachedToken = nil
             state = .signedOut
             lastError = "Session expired — sign in again."
         } catch is CancellationError {
